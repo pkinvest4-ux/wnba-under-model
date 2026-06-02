@@ -6,7 +6,7 @@ import cron from "node-cron";
 import { z } from "zod";
 import { config } from "./config.js";
 import { migrate } from "./db.js";
-import { bootstrapAutomation, isoDate, reconcileRecentResults, runDailyModel } from "./jobs.js";
+import { bootstrapAutomation, isoDate, reconcileRecentResults, reconcileResultsForDate, runDailyModel } from "./jobs.js";
 import { dateOnly } from "./model.js";
 import { markResults, pickHistory, picksForDate, playerTrend } from "./repository.js";
 
@@ -104,6 +104,16 @@ app.post("/results", async (req, res, next) => {
 app.post("/admin/run-daily", async (req, res, next) => {
   try {
     const result = await runDailyModel(req.body?.date || isoDate());
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/admin/reconcile-results", async (req, res, next) => {
+  try {
+    const date = req.body?.date || isoDate();
+    const result = await reconcileResultsForDate(date);
     res.json(result);
   } catch (error) {
     next(error);

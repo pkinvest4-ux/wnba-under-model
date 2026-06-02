@@ -222,7 +222,8 @@ function statLabel(stat) {
 }
 
 function formatDate(date) {
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(date));
+  const [year, month, day] = String(date).slice(0, 10).split("-").map(Number);
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(year, month - 1, day));
 }
 
 function formatCurrency(value) {
