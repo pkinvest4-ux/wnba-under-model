@@ -187,6 +187,10 @@ export async function savePicks(playerId, gameId, gameDate, picks) {
   });
 }
 
+export async function deletePicksForDate(gameDate) {
+  await query("DELETE FROM picks WHERE game_date = $1 AND outcome IS NULL", [gameDate]);
+}
+
 export async function picksForDate(date, onlyValue = true) {
   const { rows } = await query(`
     SELECT

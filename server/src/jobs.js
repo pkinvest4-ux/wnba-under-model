@@ -4,6 +4,7 @@ import { fetchEspnGamesByDate, fetchEspnPlayerStatsByDate, fetchEspnPlayers, fet
 import { fetchPropLinesForGames, linesForPlayer } from "./propLines.js";
 import { fatigueCycleScore } from "./model.js";
 import {
+  deletePicksForDate,
   getActivePlayers,
   getOpponentForPlayer,
   getPlayerByExternalId,
@@ -158,6 +159,7 @@ export async function runDailyModel(date = isoDate()) {
 
   const players = await getActivePlayers();
   const lineMap = await fetchPropLinesForGames(games);
+  await deletePicksForDate(date);
   let picksCount = 0;
   let valueCount = 0;
 
