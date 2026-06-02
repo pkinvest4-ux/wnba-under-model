@@ -110,7 +110,7 @@ function App() {
                     <td>{statLabel(pick.stat_type)} under {pick.line}</td>
                     <td><SourceBadge pick={pick} /></td>
                     <td><ModelBadge version={pick.model_version} /></td>
-                    <td><ReasonChips reasons={pick.reasons} /></td>
+                    <td><ReasonChips reasons={pick.reasons} formula={pick.formula_summary} breakdown={pick.factor_breakdown} /></td>
                     <td>
                       <div className="score">
                         <span>{pick.confidence_score}</span>
@@ -209,9 +209,13 @@ function ModelBadge({ version }) {
   );
 }
 
-function ReasonChips({ reasons = [] }) {
+function ReasonChips({ reasons = [], formula, breakdown = [] }) {
+  const title = [
+    formula,
+    ...breakdown.slice(0, 6).map((item) => `${item.label}: ${item.percent}%`)
+  ].filter(Boolean).join("\n");
   return (
-    <div className="reasonChips">
+    <div className="reasonChips" title={title}>
       {reasons.slice(0, 3).map((reason) => <span key={reason}>{reason}</span>)}
     </div>
   );

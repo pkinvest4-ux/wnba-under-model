@@ -161,6 +161,8 @@ function toPickDto(row) {
     under_hit_rate: row.under_hit_rate === null ? null : Number(row.under_hit_rate),
     model_version: row.model_version || "fixed_v1",
     reasons: Array.isArray(row.reasons) ? row.reasons : [],
+    factor_breakdown: Array.isArray(row.factor_breakdown) ? row.factor_breakdown : [],
+    formula_summary: row.formula_summary,
     line_source: row.line_source || "generated",
     bookmaker: row.bookmaker,
     odds_price: row.odds_price === null ? null : Number(row.odds_price),

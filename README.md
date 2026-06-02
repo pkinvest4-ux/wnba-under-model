@@ -173,7 +173,7 @@ npm run run:train
 
 Every pick stores its feature snapshot and final outcome. After result sync, the app trains per-stat logistic weights for points, rebounds, assists, and PRA once a stat has enough settled examples. Future pick scores use those learned weights and are marked `Learned` in the dashboard; until enough history exists, they use the fixed baseline model and are marked `Fixed`.
 
-Each pick also stores short reason chips, such as short rest, heavy minutes, real line, or strong historical under rate, so the dashboard explains the top drivers without exposing internal cycle math.
+Each pick also stores short reason chips and a formula breakdown. Reason chips include percentage shares of the weighted signal contribution, while the tooltip exposes the formula summary and factor shares without exposing internal cycle math.
 
 ## Notes
 

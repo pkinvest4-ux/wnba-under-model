@@ -1,4 +1,13 @@
 const STAT_KEYS = ["points", "rebounds", "assists", "pra"];
+const FIXED_WEIGHTS = {
+  intercept: -1.55,
+  fatigue_cycle_weight: 1.65,
+  rest_weight: 0.95,
+  load_weight: 0.7,
+  b2b_weight: 0.55,
+  opponent_weight: 0.45,
+  under_hit_rate_weight: 1.35
+};
 
 export function dateOnly(value) {
   if (value instanceof Date) return value.toISOString().slice(0, 10);
@@ -65,13 +74,13 @@ export function scoreUnder({ fatigue_cycle_score, days_rest, recent_minutes_avg,
   const personal = Number(under_hit_rate ?? 0.5);
 
   const z =
-    -1.55 +
-    1.65 * Number(fatigue_cycle_score || 0) +
-    0.95 * risks.rest_risk +
-    0.7 * risks.load_risk +
-    0.55 * risks.b2b_risk +
-    0.45 * risks.opponent_risk +
-    1.35 * personal;
+    FIXED_WEIGHTS.intercept +
+    FIXED_WEIGHTS.fatigue_cycle_weight * Number(fatigue_cycle_score || 0) +
+    FIXED_WEIGHTS.rest_weight * risks.rest_risk +
+    FIXED_WEIGHTS.load_weight * risks.load_risk +
+    FIXED_WEIGHTS.b2b_weight * risks.b2b_risk +
+    FIXED_WEIGHTS.opponent_weight * risks.opponent_risk +
+    FIXED_WEIGHTS.under_hit_rate_weight * personal;
 
   return probabilityToScore(sigmoid(z));
 }
@@ -120,8 +129,10 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
       under_hit_rate
     };
     const risks = normalizedRisks(baseFeatures);
-    const { confidence_score, model_version } = scoreUnderWithWeights({ ...baseFeatures, ...risks }, weightsByStat, statType);
-    const reasons = pickReasons({ ...baseFeatures, ...risks, line_source: lineOverride?.source || "generated" });
+    const allFeatures = { ...baseFeatures, ...risks, line_source: lineOverride?.source || "generated" };
+    const { confidence_score, model_version } = scoreUnderWithWeights(allFeatures, weightsByStat, statType);
+    const factor_breakdown = factorBreakdown(allFeatures, weightsByStat?.[statType]);
+    const reasons = pickReasons(allFeatures, factor_breakdown);
 
     return {
       stat_type: statType,
@@ -137,6 +148,8 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
       ...risks,
       model_version,
       reasons,
+      factor_breakdown,
+      formula_summary: "confidence = sigmoid(intercept + weighted signal inputs)",
       is_value_under: confidence_score > 65,
       line_source: lineOverride?.source || "generated",
       bookmaker: lineOverride?.bookmaker || null,
@@ -145,7 +158,7 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
   });
 }
 
-export function pickReasons(features) {
+export function pickReasons(features, breakdown = []) {
   const reasons = [];
 
   if (features.back_to_back) {
@@ -170,10 +183,41 @@ export function pickReasons(features) {
     reasons.push({ label: "Real line", score: 0.75 });
   }
 
-  return reasons
+  const formulaReasons = breakdown
+    .filter((item) => item.percent >= 12)
+    .map((item) => ({ label: `${item.label} ${item.percent}%`, score: item.percent / 100 }));
+
+  return [...formulaReasons, ...reasons]
     .sort((a, b) => b.score - a.score)
     .slice(0, 3)
     .map((reason) => reason.label);
+}
+
+export function factorBreakdown(features, learnedWeights) {
+  const weights = learnedWeights || FIXED_WEIGHTS;
+  const factors = [
+    { key: "fatigue_cycle_score", label: "Energy Index", weight: Number(weights.fatigue_cycle_weight), value: Number(features.fatigue_cycle_score || 0) },
+    { key: "rest_risk", label: "Rest", weight: Number(weights.rest_weight), value: Number(features.rest_risk || 0) },
+    { key: "load_risk", label: "Minutes", weight: Number(weights.load_weight), value: Number(features.load_risk || 0) },
+    { key: "b2b_risk", label: "B2B", weight: Number(weights.b2b_weight), value: Number(features.b2b_risk || 0) },
+    { key: "opponent_risk", label: "Matchup", weight: Number(weights.opponent_weight), value: Number(features.opponent_risk || 0) },
+    { key: "under_hit_rate", label: "Under history", weight: Number(weights.under_hit_rate_weight), value: Number(features.under_hit_rate || 0.5) }
+  ].map((factor) => ({
+    ...factor,
+    contribution: Math.max(0, factor.weight * factor.value)
+  }));
+
+  const total = factors.reduce((sum, factor) => sum + factor.contribution, 0) || 1;
+  return factors
+    .map((factor) => ({
+      key: factor.key,
+      label: factor.label,
+      value: Number(factor.value.toFixed(4)),
+      weight: Number(factor.weight.toFixed(4)),
+      contribution: Number(factor.contribution.toFixed(4)),
+      percent: Math.round((factor.contribution / total) * 100)
+    }))
+    .sort((a, b) => b.percent - a.percent);
 }
 
 function sigmoid(value) {
