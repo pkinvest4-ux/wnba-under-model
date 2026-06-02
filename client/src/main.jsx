@@ -70,7 +70,7 @@ function App() {
       <section className="metrics">
         <Metric icon={<TrendingDown />} label="Today's Value Unders" value={today.picks?.length || 0} />
         <Metric icon={<Activity />} label="Hit Rate" value={`${history.summary?.hit_rate || 0}%`} />
-        <Metric icon={<BarChart3 />} label="Flat ROI" value={`${history.summary?.flat_unit_roi || 0}%`} />
+        <Metric icon={<BarChart3 />} label={`P/L @ ${formatCurrency(history.summary?.unit_size_dollars || 10)}`} value={formatCurrency(history.summary?.estimated_profit_dollars || 0)} />
         <Metric icon={<CalendarDays />} label="Settled Picks" value={history.summary?.settled || 0} />
       </section>
 
@@ -213,6 +213,10 @@ function statLabel(stat) {
 
 function formatDate(date) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(date));
+}
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(value || 0));
 }
 
 createRoot(document.getElementById("root")).render(<App />);

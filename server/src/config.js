@@ -19,5 +19,6 @@ export const config = {
   seasonStartDate: process.env.WNBA_SEASON_START || `${new Date().getFullYear()}-05-15`,
   cronEnabled: process.env.CRON_ENABLED !== "false",
   autoBootstrap: process.env.AUTO_BOOTSTRAP !== "false",
+  unitSizeDollars: Number(process.env.UNIT_SIZE_DOLLARS || 10),
   clientDistPath: process.env.CLIENT_DIST_PATH || new URL("../../client/dist", import.meta.url).pathname
 };

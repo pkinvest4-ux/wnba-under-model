@@ -34,6 +34,7 @@ WNBA_SEASON_START=2026-05-15
 ENABLE_MOCK_DATA=true
 CRON_ENABLED=true
 AUTO_BOOTSTRAP=true
+UNIT_SIZE_DOLLARS=10
 PORT=3000
 ```
 
@@ -76,6 +77,8 @@ Optional query:
 ### `GET /picks/history`
 
 Returns all prior picks and a flat-unit record summary.
+
+The history summary assumes a flat average bet size configured by `UNIT_SIZE_DOLLARS`, defaulting to `$10`.
 
 ### `GET /players/:id/trend`
 
