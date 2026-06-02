@@ -91,6 +91,11 @@ export async function migrate() {
       days_rest INTEGER,
       back_to_back BOOLEAN,
       under_hit_rate NUMERIC,
+      rest_risk NUMERIC,
+      load_risk NUMERIC,
+      opponent_risk NUMERIC,
+      b2b_risk NUMERIC,
+      model_version TEXT DEFAULT 'fixed_v1',
       line_source TEXT DEFAULT 'generated',
       bookmaker TEXT,
       odds_price NUMERIC,
@@ -104,9 +109,28 @@ export async function migrate() {
     CREATE INDEX IF NOT EXISTS idx_picks_game_date ON picks(game_date);
     CREATE INDEX IF NOT EXISTS idx_logs_player_date ON player_game_logs(player_id, game_date DESC);
 
+    CREATE TABLE IF NOT EXISTS model_weights (
+      stat_type TEXT PRIMARY KEY CHECK (stat_type IN ('points', 'rebounds', 'assists', 'pra')),
+      intercept NUMERIC NOT NULL,
+      fatigue_cycle_weight NUMERIC NOT NULL,
+      rest_weight NUMERIC NOT NULL,
+      load_weight NUMERIC NOT NULL,
+      b2b_weight NUMERIC NOT NULL,
+      opponent_weight NUMERIC NOT NULL,
+      under_hit_rate_weight NUMERIC NOT NULL,
+      sample_size INTEGER NOT NULL DEFAULT 0,
+      validation_log_loss NUMERIC,
+      trained_at TIMESTAMPTZ DEFAULT now()
+    );
+
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS line_source TEXT DEFAULT 'generated';
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS bookmaker TEXT;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS odds_price NUMERIC;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS rest_risk NUMERIC;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS load_risk NUMERIC;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS opponent_risk NUMERIC;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS b2b_risk NUMERIC;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS model_version TEXT DEFAULT 'fixed_v1';
     ALTER TABLE players ADD COLUMN IF NOT EXISTS roster_status TEXT DEFAULT 'roster';
     ALTER TABLE players ADD COLUMN IF NOT EXISTS last_known_starter BOOLEAN DEFAULT false;
   `);

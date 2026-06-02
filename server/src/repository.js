@@ -164,9 +164,10 @@ export async function savePicks(playerId, gameId, gameDate, picks) {
         `INSERT INTO picks (
           player_id, game_id, game_date, stat_type, line, confidence_score, fatigue_cycle_score,
           energy_band, opponent_def_rating, recent_minutes_avg, days_rest, back_to_back,
-          under_hit_rate, line_source, bookmaker, odds_price, is_value_under
+          under_hit_rate, rest_risk, load_risk, opponent_risk, b2b_risk, model_version,
+          line_source, bookmaker, odds_price, is_value_under
         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
          ON CONFLICT (player_id, game_date, stat_type, line) DO UPDATE SET
            game_id = EXCLUDED.game_id,
            confidence_score = EXCLUDED.confidence_score,
@@ -177,6 +178,11 @@ export async function savePicks(playerId, gameId, gameDate, picks) {
            days_rest = EXCLUDED.days_rest,
            back_to_back = EXCLUDED.back_to_back,
            under_hit_rate = EXCLUDED.under_hit_rate,
+           rest_risk = EXCLUDED.rest_risk,
+           load_risk = EXCLUDED.load_risk,
+           opponent_risk = EXCLUDED.opponent_risk,
+           b2b_risk = EXCLUDED.b2b_risk,
+           model_version = EXCLUDED.model_version,
            line_source = EXCLUDED.line_source,
            bookmaker = EXCLUDED.bookmaker,
            odds_price = EXCLUDED.odds_price,
@@ -195,6 +201,11 @@ export async function savePicks(playerId, gameId, gameDate, picks) {
           pick.days_rest,
           pick.back_to_back,
           pick.under_hit_rate,
+          pick.rest_risk,
+          pick.load_risk,
+          pick.opponent_risk,
+          pick.b2b_risk,
+          pick.model_version || "fixed_v1",
           pick.line_source || "generated",
           pick.bookmaker || null,
           pick.odds_price ?? null,
@@ -203,6 +214,58 @@ export async function savePicks(playerId, gameId, gameDate, picks) {
       );
     }
   });
+}
+
+export async function getModelWeights() {
+  const { rows } = await query("SELECT * FROM model_weights");
+  return Object.fromEntries(rows.map((row) => [row.stat_type, row]));
+}
+
+export async function getSettledTrainingPicks() {
+  const { rows } = await query(`
+    SELECT *
+    FROM picks
+    WHERE outcome IN ('hit', 'miss')
+      AND rest_risk IS NOT NULL
+      AND load_risk IS NOT NULL
+      AND opponent_risk IS NOT NULL
+      AND b2b_risk IS NOT NULL
+    ORDER BY game_date ASC, id ASC
+  `);
+  return rows;
+}
+
+export async function saveModelWeights(statType, weights) {
+  await query(`
+    INSERT INTO model_weights (
+      stat_type, intercept, fatigue_cycle_weight, rest_weight, load_weight,
+      b2b_weight, opponent_weight, under_hit_rate_weight, sample_size,
+      validation_log_loss, trained_at
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())
+    ON CONFLICT (stat_type) DO UPDATE SET
+      intercept = EXCLUDED.intercept,
+      fatigue_cycle_weight = EXCLUDED.fatigue_cycle_weight,
+      rest_weight = EXCLUDED.rest_weight,
+      load_weight = EXCLUDED.load_weight,
+      b2b_weight = EXCLUDED.b2b_weight,
+      opponent_weight = EXCLUDED.opponent_weight,
+      under_hit_rate_weight = EXCLUDED.under_hit_rate_weight,
+      sample_size = EXCLUDED.sample_size,
+      validation_log_loss = EXCLUDED.validation_log_loss,
+      trained_at = now()
+  `, [
+    statType,
+    weights.intercept,
+    weights.fatigue_cycle_weight,
+    weights.rest_weight,
+    weights.load_weight,
+    weights.b2b_weight,
+    weights.opponent_weight,
+    weights.under_hit_rate_weight,
+    weights.sample_size,
+    weights.validation_log_loss
+  ]);
 }
 
 export async function deletePicksForDate(gameDate) {

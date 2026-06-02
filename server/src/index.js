@@ -135,6 +135,7 @@ function toPickDto(row) {
     days_rest: row.days_rest,
     back_to_back: row.back_to_back,
     under_hit_rate: row.under_hit_rate === null ? null : Number(row.under_hit_rate),
+    model_version: row.model_version || "fixed_v1",
     line_source: row.line_source || "generated",
     bookmaker: row.bookmaker,
     odds_price: row.odds_price === null ? null : Number(row.odds_price),

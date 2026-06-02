@@ -89,6 +89,7 @@ function App() {
                   <th>Player</th>
                   <th>Stat Line</th>
                   <th>Source</th>
+                  <th>Model</th>
                   <th>Confidence</th>
                   <th>Energy Index</th>
                 </tr>
@@ -96,7 +97,7 @@ function App() {
               <tbody>
                 {!loading && today.picks?.length === 0 && (
                   <tr>
-                    <td colSpan="5" className="empty">No value unders are flagged for today.</td>
+                    <td colSpan="6" className="empty">No value unders are flagged for today.</td>
                   </tr>
                 )}
                 {today.picks?.map((pick) => (
@@ -107,6 +108,7 @@ function App() {
                     </td>
                     <td>{statLabel(pick.stat_type)} under {pick.line}</td>
                     <td><SourceBadge pick={pick} /></td>
+                    <td><ModelBadge version={pick.model_version} /></td>
                     <td>
                       <div className="score">
                         <span>{pick.confidence_score}</span>
@@ -192,6 +194,15 @@ function SourceBadge({ pick }) {
   return (
     <span className={`sourceBadge ${real ? "real" : "fallback"}`} title={real ? pick.bookmaker || "Real line" : "Generated model line"}>
       {real ? pick.bookmaker || "Real" : "Model"}
+    </span>
+  );
+}
+
+function ModelBadge({ version }) {
+  const learned = version?.startsWith("learned");
+  return (
+    <span className={`sourceBadge ${learned ? "real" : "fallback"}`} title={version || "fixed_v1"}>
+      {learned ? "Learned" : "Fixed"}
     </span>
   );
 }

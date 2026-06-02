@@ -2,10 +2,12 @@ import { config } from "./config.js";
 import { fetchGamesByDate, fetchPlayers, fetchPlayerStats, fetchTeams } from "./balldontlie.js";
 import { fetchEspnGamesByDate, fetchEspnPlayerStatsByDate, fetchEspnPlayers, fetchEspnTeams } from "./espn.js";
 import { fetchPropLinesForGames, linesForPlayer } from "./propLines.js";
+import { trainModelWeights } from "./training.js";
 import { fatigueCycleScore } from "./model.js";
 import {
   deletePicksForDate,
   getActivePlayers,
+  getModelWeights,
   getOpponentForPlayer,
   getPlayerByExternalId,
   getPlayerLogs,
@@ -161,6 +163,7 @@ export async function runDailyModel(date = isoDate()) {
 
   const players = await getActivePlayers();
   const lineMap = await fetchPropLinesForGames(games);
+  const weightsByStat = await getModelWeights();
   await deletePicksForDate(date);
   let picksCount = 0;
   let valueCount = 0;
@@ -170,7 +173,7 @@ export async function runDailyModel(date = isoDate()) {
     if (!matchup) continue;
 
     const logs = await getPlayerLogs(player.id);
-    const picks = buildPickFeatures(player, logs, date, matchup.opponent?.defensive_rating || 100, linesForPlayer(lineMap, player));
+    const picks = buildPickFeatures(player, logs, date, matchup.opponent?.defensive_rating || 100, linesForPlayer(lineMap, player), weightsByStat);
     await savePicks(player.id, matchup.game.id, date, picks);
     picksCount += picks.length;
     valueCount += picks.filter((pick) => pick.is_value_under).length;
@@ -203,7 +206,8 @@ export async function reconcileResultsForDate(date = addDays(isoDate(), -1)) {
   }
 
   const updated = results.length ? await markResults(results) : [];
-  return { date, stat_rows: stats.length, matched_players: results.length, updated_picks: updated.length };
+  const training = updated.length ? await trainModelWeights() : [];
+  return { date, stat_rows: stats.length, matched_players: results.length, updated_picks: updated.length, training };
 }
 
 export async function reconcileRecentResults(daysBack = 3) {
@@ -220,8 +224,9 @@ export async function bootstrapAutomation() {
   const hasLiveStats = config.dataProvider === "espn" || Boolean(config.balldontlieApiKey);
   const logs = hasLiveStats ? await syncSeasonGameLogs(config.season) : await seedMockLogs();
   const results = hasLiveStats ? await reconcileRecentResults(3) : [];
+  const training = await trainModelWeights();
   const daily = await runDailyModel();
-  return { reference, logs, results, daily };
+  return { reference, logs, results, training, daily };
 }
 
 function parseMinutes(value) {

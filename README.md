@@ -153,6 +153,7 @@ Then load historical logs into `player_game_logs` or let the app build picks fro
 The service runs on its own:
 
 - Startup automation refreshes rosters/logs, grades recent results, and generates current-day picks.
+- Startup automation also trains learned scoring weights when enough settled outcomes exist.
 - A 10am ET cron job generates daily picks.
 - A 1:30am ET cron job grades recent completed picks.
 - A 2pm ET cron job runs a second short result sync for late stat updates.
@@ -162,7 +163,12 @@ If you prefer separate Railway cron services, set `CRON_ENABLED=false` on the we
 ```bash
 npm run run:daily
 npm run run:results
+npm run run:train
 ```
+
+## Learning Loop
+
+Every pick stores its feature snapshot and final outcome. After result sync, the app trains per-stat logistic weights for points, rebounds, assists, and PRA once a stat has enough settled examples. Future pick scores use those learned weights and are marked `Learned` in the dashboard; until enough history exists, they use the fixed baseline model and are marked `Fixed`.
 
 ## Notes
 

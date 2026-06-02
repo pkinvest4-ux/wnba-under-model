@@ -8,7 +8,8 @@
     "start": "node src/index.js",
     "seed": "node scripts/seed.js",
     "run:daily": "node scripts/runDaily.js",
-    "run:results": "node scripts/reconcileResults.js"
+    "run:results": "node scripts/reconcileResults.js",
+    "run:train": "node scripts/trainModel.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

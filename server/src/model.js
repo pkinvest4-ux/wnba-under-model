@@ -39,6 +39,15 @@ export function underHitRate(logs, statType, line) {
   return Number((hits / logs.length).toFixed(4));
 }
 
+export function normalizedRisks({ days_rest, recent_minutes_avg, back_to_back, opponent_def_rating }) {
+  return {
+    rest_risk: days_rest <= 1 ? 1 : days_rest === 2 ? 0.55 : 0.2,
+    load_risk: Math.min(1, Math.max(0, (Number(recent_minutes_avg || 0) - 24) / 12)),
+    opponent_risk: Math.min(1, Math.max(0, (Number(opponent_def_rating || 100) - 96) / 10)),
+    b2b_risk: back_to_back ? 1 : 0
+  };
+}
+
 export function rollingMinutes(logs, gameDate) {
   const cutoff = new Date(`${dateOnly(gameDate)}T12:00:00Z`);
   const weekAgo = new Date(cutoff);
@@ -52,26 +61,41 @@ export function rollingMinutes(logs, gameDate) {
 }
 
 export function scoreUnder({ fatigue_cycle_score, days_rest, recent_minutes_avg, back_to_back, opponent_def_rating, under_hit_rate }) {
-  const restRisk = days_rest <= 1 ? 1 : days_rest === 2 ? 0.55 : 0.2;
-  const loadRisk = Math.min(1, Math.max(0, (Number(recent_minutes_avg || 0) - 24) / 12));
-  const opponentRisk = Math.min(1, Math.max(0, (Number(opponent_def_rating || 100) - 96) / 10));
-  const b2bRisk = back_to_back ? 1 : 0;
+  const risks = normalizedRisks({ days_rest, recent_minutes_avg, back_to_back, opponent_def_rating });
   const personal = Number(under_hit_rate ?? 0.5);
 
   const z =
     -1.55 +
     1.65 * Number(fatigue_cycle_score || 0) +
-    0.95 * restRisk +
-    0.7 * loadRisk +
-    0.55 * b2bRisk +
-    0.45 * opponentRisk +
+    0.95 * risks.rest_risk +
+    0.7 * risks.load_risk +
+    0.55 * risks.b2b_risk +
+    0.45 * risks.opponent_risk +
     1.35 * personal;
 
-  const probability = 1 / (1 + Math.exp(-z));
-  return Math.max(0, Math.min(100, Math.round(probability * 100)));
+  return probabilityToScore(sigmoid(z));
 }
 
-export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lineOverrides = {}) {
+export function scoreUnderWithWeights(features, weightsByStat, statType) {
+  const weights = weightsByStat?.[statType];
+  if (!weights) return { confidence_score: scoreUnder(features), model_version: "fixed_v1" };
+
+  const z =
+    Number(weights.intercept) +
+    Number(weights.fatigue_cycle_weight) * Number(features.fatigue_cycle_score || 0) +
+    Number(weights.rest_weight) * Number(features.rest_risk || 0) +
+    Number(weights.load_weight) * Number(features.load_risk || 0) +
+    Number(weights.b2b_weight) * Number(features.b2b_risk || 0) +
+    Number(weights.opponent_weight) * Number(features.opponent_risk || 0) +
+    Number(weights.under_hit_rate_weight) * Number(features.under_hit_rate || 0.5);
+
+  return {
+    confidence_score: probabilityToScore(sigmoid(z)),
+    model_version: `learned_${weights.sample_size || 0}`
+  };
+}
+
+export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lineOverrides = {}, weightsByStat = {}) {
   const sortedLogs = [...logs].sort((a, b) => dateOnly(b.game_date).localeCompare(dateOnly(a.game_date)));
   const previous = sortedLogs[0];
   const daysRest = previous
@@ -85,14 +109,16 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
     const lineOverride = lineOverrides[statType];
     const line = lineOverride?.line ?? buildLine(sortedLogs, statType);
     const under_hit_rate = underHitRate(sortedLogs, statType, line);
-    const confidence_score = scoreUnder({
+    const baseFeatures = {
       fatigue_cycle_score,
       days_rest: daysRest,
       recent_minutes_avg,
       back_to_back,
       opponent_def_rating: opponentDefRating,
       under_hit_rate
-    });
+    };
+    const risks = normalizedRisks(baseFeatures);
+    const { confidence_score, model_version } = scoreUnderWithWeights({ ...baseFeatures, ...risks }, weightsByStat, statType);
 
     return {
       stat_type: statType,
@@ -105,10 +131,20 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
       days_rest: daysRest,
       back_to_back,
       under_hit_rate,
+      ...risks,
+      model_version,
       is_value_under: confidence_score > 65,
       line_source: lineOverride?.source || "generated",
       bookmaker: lineOverride?.bookmaker || null,
       odds_price: lineOverride?.price ?? null
     };
   });
+}
+
+function sigmoid(value) {
+  return 1 / (1 + Math.exp(-value));
+}
+
+function probabilityToScore(probability) {
+  return Math.max(0, Math.min(100, Math.round(probability * 100)));
 }

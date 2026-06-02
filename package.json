@@ -9,7 +9,8 @@
     "start": "npm run start --workspace server",
     "seed": "npm run seed --workspace server",
     "run:daily": "npm run run:daily --workspace server",
-    "run:results": "npm run run:results --workspace server"
+    "run:results": "npm run run:results --workspace server",
+    "run:train": "npm run run:train --workspace server"
   },
   "workspaces": [
     "server",
