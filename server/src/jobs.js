@@ -213,8 +213,9 @@ export async function reconcileRecentResults(daysBack = 3) {
 
 export async function bootstrapAutomation() {
   const reference = await syncReferenceData();
-  const logs = config.balldontlieApiKey ? await syncSeasonGameLogs(config.season) : await seedMockLogs();
-  const results = config.balldontlieApiKey ? await reconcileRecentResults(3) : [];
+  const hasLiveStats = config.dataProvider === "espn" || Boolean(config.balldontlieApiKey);
+  const logs = hasLiveStats ? await syncSeasonGameLogs(config.season) : await seedMockLogs();
+  const results = hasLiveStats ? await reconcileRecentResults(3) : [];
   const daily = await runDailyModel();
   return { reference, logs, results, daily };
 }
