@@ -96,6 +96,7 @@ export async function migrate() {
       opponent_risk NUMERIC,
       b2b_risk NUMERIC,
       model_version TEXT DEFAULT 'fixed_v1',
+      reasons JSONB DEFAULT '[]'::jsonb,
       line_source TEXT DEFAULT 'generated',
       bookmaker TEXT,
       odds_price NUMERIC,
@@ -131,6 +132,7 @@ export async function migrate() {
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS opponent_risk NUMERIC;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS b2b_risk NUMERIC;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS model_version TEXT DEFAULT 'fixed_v1';
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS reasons JSONB DEFAULT '[]'::jsonb;
     ALTER TABLE players ADD COLUMN IF NOT EXISTS roster_status TEXT DEFAULT 'roster';
     ALTER TABLE players ADD COLUMN IF NOT EXISTS last_known_starter BOOLEAN DEFAULT false;
   `);

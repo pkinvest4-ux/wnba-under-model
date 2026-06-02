@@ -158,7 +158,7 @@ h3 {
 table {
   width: 100%;
   border-collapse: collapse;
-  table-layout: fixed;
+  table-layout: auto;
 }
 
 th,
@@ -279,6 +279,26 @@ td span {
   font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
+}
+
+.reasonChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 150px;
+}
+
+.reasonChips span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #3e4654;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .detailPanel {

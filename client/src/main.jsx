@@ -90,6 +90,7 @@ function App() {
                   <th>Stat Line</th>
                   <th>Source</th>
                   <th>Model</th>
+                  <th>Why</th>
                   <th>Confidence</th>
                   <th>Energy Index</th>
                 </tr>
@@ -97,7 +98,7 @@ function App() {
               <tbody>
                 {!loading && today.picks?.length === 0 && (
                   <tr>
-                    <td colSpan="6" className="empty">No value unders are flagged for today.</td>
+                    <td colSpan="7" className="empty">No value unders are flagged for today.</td>
                   </tr>
                 )}
                 {today.picks?.map((pick) => (
@@ -109,6 +110,7 @@ function App() {
                     <td>{statLabel(pick.stat_type)} under {pick.line}</td>
                     <td><SourceBadge pick={pick} /></td>
                     <td><ModelBadge version={pick.model_version} /></td>
+                    <td><ReasonChips reasons={pick.reasons} /></td>
                     <td>
                       <div className="score">
                         <span>{pick.confidence_score}</span>
@@ -204,6 +206,14 @@ function ModelBadge({ version }) {
     <span className={`sourceBadge ${learned ? "real" : "fallback"}`} title={version || "fixed_v1"}>
       {learned ? "Learned" : "Fixed"}
     </span>
+  );
+}
+
+function ReasonChips({ reasons = [] }) {
+  return (
+    <div className="reasonChips">
+      {reasons.slice(0, 3).map((reason) => <span key={reason}>{reason}</span>)}
+    </div>
   );
 }
 

@@ -119,6 +119,7 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
     };
     const risks = normalizedRisks(baseFeatures);
     const { confidence_score, model_version } = scoreUnderWithWeights({ ...baseFeatures, ...risks }, weightsByStat, statType);
+    const reasons = pickReasons({ ...baseFeatures, ...risks, line_source: lineOverride?.source || "generated" });
 
     return {
       stat_type: statType,
@@ -133,12 +134,44 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
       under_hit_rate,
       ...risks,
       model_version,
+      reasons,
       is_value_under: confidence_score > 65,
       line_source: lineOverride?.source || "generated",
       bookmaker: lineOverride?.bookmaker || null,
       odds_price: lineOverride?.price ?? null
     };
   });
+}
+
+export function pickReasons(features) {
+  const reasons = [];
+
+  if (features.back_to_back) {
+    reasons.push({ label: "B2B", score: 1 });
+  }
+  if (Number(features.days_rest) <= 1) {
+    reasons.push({ label: "Short rest", score: features.rest_risk });
+  }
+  if (Number(features.recent_minutes_avg || 0) >= 30) {
+    reasons.push({ label: "Heavy minutes", score: features.load_risk });
+  }
+  if (Number(features.under_hit_rate || 0) >= 0.62) {
+    reasons.push({ label: `${Math.round(Number(features.under_hit_rate) * 100)}% under rate`, score: features.under_hit_rate });
+  }
+  if (Number(features.fatigue_cycle_score || 0) >= 0.67) {
+    reasons.push({ label: "Low Energy Index", score: features.fatigue_cycle_score });
+  }
+  if (Number(features.opponent_def_rating || 100) >= 101) {
+    reasons.push({ label: "Tough matchup", score: features.opponent_risk });
+  }
+  if (features.line_source && features.line_source !== "generated") {
+    reasons.push({ label: "Real line", score: 0.75 });
+  }
+
+  return reasons
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map((reason) => reason.label);
 }
 
 function sigmoid(value) {
