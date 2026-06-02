@@ -96,7 +96,9 @@ export function scoreUnderWithWeights(features, weightsByStat, statType) {
 }
 
 export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lineOverrides = {}, weightsByStat = {}) {
-  const sortedLogs = [...logs].sort((a, b) => dateOnly(b.game_date).localeCompare(dateOnly(a.game_date)));
+  const sortedLogs = logs
+    .filter((log) => dateOnly(log.game_date) < dateOnly(gameDate))
+    .sort((a, b) => dateOnly(b.game_date).localeCompare(dateOnly(a.game_date)));
   const previous = sortedLogs[0];
   const daysRest = previous
     ? Math.max(0, Math.round((new Date(`${dateOnly(gameDate)}T12:00:00Z`) - new Date(`${dateOnly(previous.game_date)}T12:00:00Z`)) / 86400000) - 1)

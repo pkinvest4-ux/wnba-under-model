@@ -120,8 +120,18 @@ app.post("/admin/reconcile-results", async (req, res, next) => {
   }
 });
 
+app.use((req, res, next) => {
+  if (req.path === "/" || !path.extname(req.path)) {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+  }
+  next();
+});
+
 app.use(express.static(config.clientDistPath));
 app.use((_req, res) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   res.sendFile(path.join(config.clientDistPath, "index.html"));
 });
 

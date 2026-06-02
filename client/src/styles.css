@@ -54,6 +54,18 @@ h1 {
   line-height: 1.1;
 }
 
+.buildTag {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: 8px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #e9eef6;
+  color: #4b5565;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 h2 {
   margin-bottom: 4px;
   font-size: 18px;

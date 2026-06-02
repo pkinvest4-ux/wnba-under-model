@@ -58,7 +58,7 @@ function App() {
       <header className="topbar">
         <div>
           <p className="eyebrow">WNBA Player Performance</p>
-          <h1>Under Model Dashboard</h1>
+          <h1>Under Model Dashboard <span className="buildTag">Live v2</span></h1>
         </div>
         <button className="iconButton" onClick={load} aria-label="Refresh model data" title="Refresh model data">
           <RefreshCw size={18} />
