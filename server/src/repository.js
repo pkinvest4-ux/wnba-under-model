@@ -20,18 +20,36 @@ export async function upsertPlayer(player) {
   const { rows: teamRows } = await query("SELECT id FROM teams WHERE external_id = $1", [player.team_external_id]);
   const teamId = teamRows[0]?.id || null;
   const { rows } = await query(
-    `INSERT INTO players (external_id, first_name, last_name, position, team_id, first_tracked_game_date, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, now())
+    `INSERT INTO players (
+       external_id, first_name, last_name, position, team_id, first_tracked_game_date,
+       roster_status, last_known_starter, updated_at
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
      ON CONFLICT (external_id) DO UPDATE SET
        first_name = EXCLUDED.first_name,
        last_name = EXCLUDED.last_name,
        position = EXCLUDED.position,
        team_id = COALESCE(EXCLUDED.team_id, players.team_id),
        first_tracked_game_date = COALESCE(players.first_tracked_game_date, EXCLUDED.first_tracked_game_date),
+       roster_status = COALESCE(EXCLUDED.roster_status, players.roster_status),
+       last_known_starter = CASE
+         WHEN EXCLUDED.last_known_starter = true THEN true
+         WHEN EXCLUDED.roster_status = 'roster' THEN players.last_known_starter
+         ELSE COALESCE(EXCLUDED.last_known_starter, players.last_known_starter)
+       END,
        active = true,
        updated_at = now()
      RETURNING *`,
-    [player.external_id, player.first_name, player.last_name, player.position, teamId, player.first_tracked_game_date]
+    [
+      player.external_id,
+      player.first_name,
+      player.last_name,
+      player.position,
+      teamId,
+      player.first_tracked_game_date,
+      player.roster_status || "roster",
+      Boolean(player.last_known_starter)
+    ]
   );
   return rows[0];
 }
@@ -197,6 +215,8 @@ export async function picksForDate(date, onlyValue = true) {
       picks.*,
       p.first_name,
       p.last_name,
+      p.last_known_starter,
+      p.roster_status,
       t.abbreviation AS team_abbreviation,
       g.status AS game_status
     FROM picks
@@ -216,6 +236,8 @@ export async function pickHistory() {
       picks.*,
       p.first_name,
       p.last_name,
+      p.last_known_starter,
+      p.roster_status,
       t.abbreviation AS team_abbreviation
     FROM picks
     JOIN players p ON p.id = picks.player_id

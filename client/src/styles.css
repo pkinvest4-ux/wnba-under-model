@@ -187,7 +187,10 @@ tbody tr.selected {
 }
 
 td strong {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
   overflow-wrap: anywhere;
 }
 
@@ -263,6 +266,19 @@ td span {
   border-color: #a8d1bd;
   color: #1f6848;
   background: #eef8f3;
+}
+
+.starterBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #263241;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .detailPanel {

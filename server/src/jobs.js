@@ -89,7 +89,9 @@ export async function syncSeasonGameLogs(season = config.season) {
       last_name: row.player.last_name,
       position: row.player.position_abbreviation || row.player.position,
       team_external_id: row.team ? String(row.team.id) : null,
-      first_tracked_game_date: (row.game.date || config.seasonStartDate).slice(0, 10)
+      first_tracked_game_date: (row.game.date || config.seasonStartDate).slice(0, 10),
+      roster_status: "roster",
+      last_known_starter: Boolean(row.player.starter)
     });
 
     const homeExternalId = String(row.game.home_team?.id || row.game.home_team_id || "");

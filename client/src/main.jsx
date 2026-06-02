@@ -102,7 +102,7 @@ function App() {
                 {today.picks?.map((pick) => (
                   <tr key={pick.id} onClick={() => openPlayer(pick.player_id)} className={selectedPlayer === pick.player_id ? "selected" : ""}>
                     <td>
-                      <strong>{pick.player_name}</strong>
+                      <strong>{pick.player_name} {pick.starter && <span className="starterBadge">Starter</span>}</strong>
                       <span>{pick.team}</span>
                     </td>
                     <td>{statLabel(pick.stat_type)} under {pick.line}</td>

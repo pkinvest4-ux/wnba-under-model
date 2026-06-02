@@ -24,23 +24,30 @@ export async function fetchEspnTeams() {
 }
 
 export async function fetchEspnPlayers(season) {
-  const index = await getJson(`${ESPN_CORE}/seasons/${season}/athletes?limit=1000`);
+  const teamsIndex = await getJson(`${ESPN_CORE}/teams?limit=100`);
   const players = [];
+  const seen = new Set();
 
-  for (const item of index.items || []) {
-    const athlete = await getJson(httpsRef(item.$ref));
-    let team;
-    if (athlete.team?.$ref) {
-      team = await getJson(httpsRef(athlete.team.$ref));
+  for (const teamItem of teamsIndex.items || []) {
+    const team = await getJson(httpsRef(teamItem.$ref));
+    if (!team.isActive || !team.athletes?.$ref) continue;
+
+    const roster = await getJson(`${httpsRef(team.athletes.$ref)}&limit=100`);
+    for (const item of roster.items || []) {
+      const athlete = await getJson(httpsRef(item.$ref));
+      if (seen.has(String(athlete.id))) continue;
+      seen.add(String(athlete.id));
+
+      players.push({
+        external_id: String(athlete.id),
+        first_name: athlete.firstName || athlete.displayName?.split(" ")[0] || "Unknown",
+        last_name: athlete.lastName || athlete.displayName?.split(" ").slice(1).join(" ") || "Player",
+        position: athlete.position?.abbreviation || athlete.position?.displayName || null,
+        team_external_id: String(team.id),
+        roster_status: "roster",
+        last_known_starter: false
+      });
     }
-
-    players.push({
-      external_id: String(athlete.id),
-      first_name: athlete.firstName || athlete.displayName?.split(" ")[0] || "Unknown",
-      last_name: athlete.lastName || athlete.displayName?.split(" ").slice(1).join(" ") || "Player",
-      position: athlete.position?.abbreviation || athlete.position?.displayName || null,
-      team_external_id: team ? String(team.id) : null
-    });
   }
 
   return players;
@@ -88,7 +95,8 @@ export async function fetchEspnPlayerStatsByDate(date, season) {
             id: athleteRow.athlete.id,
             first_name: athleteRow.athlete.displayName?.split(" ")[0],
             last_name: athleteRow.athlete.displayName?.split(" ").slice(1).join(" "),
-            position_abbreviation: athleteRow.athlete.position?.abbreviation
+            position_abbreviation: athleteRow.athlete.position?.abbreviation,
+            starter: Boolean(athleteRow.starter)
           },
           team: {
             id: team.id,

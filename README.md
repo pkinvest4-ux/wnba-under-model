@@ -24,6 +24,9 @@ DATA_PROVIDER=espn
 PROP_PROVIDER=generated
 PROPLINE_API_KEY=
 PROPLINE_SPORT_KEY=basketball_wnba
+THE_ODDS_API_KEY=
+THE_ODDS_API_SPORT_KEY=basketball_wnba
+THE_ODDS_API_REGIONS=us
 BALLDONTLIE_API_KEY=
 BALLDONTLIE_BASE_URL=https://api.balldontlie.io/wnba/v1
 WNBA_SEASON=2026
@@ -36,7 +39,7 @@ PORT=3000
 
 No paid API key is required for WNBA schedule, roster, boxscore, or result data when `DATA_PROVIDER=espn`.
 
-Real prop lines require a line source. Set `PROP_PROVIDER=propline` and add a free `PROPLINE_API_KEY` to use PropLine when WNBA props are available for your key/sport feed. Without a prop-line key, the app still runs automatically using generated model lines and marks those picks with source `Model`.
+Real prop lines require a line source. Set `PROP_PROVIDER=all` and add free `PROPLINE_API_KEY` and/or `THE_ODDS_API_KEY` values. The app tries PropLine first, then The Odds API, and falls back to generated model lines for missing player/stat lines. Without prop-line keys, the app still runs automatically using generated model lines and marks those picks with source `Model`.
 
 ## Local Setup
 

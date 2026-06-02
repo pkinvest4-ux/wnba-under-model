@@ -17,7 +17,22 @@ export function normalizeName(name = "") {
 }
 
 export async function fetchPropLinesForGames(games = []) {
-  if (config.propProvider !== "propline" || !config.propLineApiKey) return new Map();
+  const merged = new Map();
+  const provider = config.propProvider;
+
+  if ((provider === "propline" || provider === "all") && config.propLineApiKey) {
+    mergeLineMaps(merged, await fetchPropLineLines(games));
+  }
+
+  if ((provider === "the_odds_api" || provider === "all") && config.theOddsApiKey) {
+    mergeLineMaps(merged, await fetchTheOddsApiLines(games));
+  }
+
+  return merged;
+}
+
+async function fetchPropLineLines(games = []) {
+  if (!config.propLineApiKey) return new Map();
 
   try {
     const { PropLine } = await import("propline");
@@ -56,7 +71,55 @@ export async function fetchPropLinesForGames(games = []) {
 
     return lineMap;
   } catch (error) {
-    console.error("prop line sync failed; falling back to generated lines", error.message);
+    console.error("PropLine sync failed; falling back where needed", error.message);
+    return new Map();
+  }
+}
+
+async function fetchTheOddsApiLines(games = []) {
+  if (!config.theOddsApiKey) return new Map();
+
+  try {
+    const eventsUrl = new URL(`https://api.the-odds-api.com/v4/sports/${config.theOddsApiSportKey}/events`);
+    eventsUrl.searchParams.set("apiKey", config.theOddsApiKey);
+    const events = await oddsApiRequest(eventsUrl);
+    const matchedEvents = events.filter((event) => games.some((game) => eventMatchesGame(event, game)));
+    const lineMap = new Map();
+
+    for (const event of matchedEvents) {
+      const oddsUrl = new URL(`https://api.the-odds-api.com/v4/sports/${config.theOddsApiSportKey}/events/${event.id}/odds`);
+      oddsUrl.searchParams.set("apiKey", config.theOddsApiKey);
+      oddsUrl.searchParams.set("regions", config.theOddsApiRegions);
+      oddsUrl.searchParams.set("markets", Object.keys(MARKET_TO_STAT).join(","));
+      oddsUrl.searchParams.set("oddsFormat", "american");
+
+      const odds = await oddsApiRequest(oddsUrl);
+      for (const bookmaker of odds.bookmakers || []) {
+        for (const market of bookmaker.markets || []) {
+          const statType = MARKET_TO_STAT[market.key];
+          if (!statType) continue;
+
+          for (const outcome of market.outcomes || []) {
+            if (String(outcome.name).toLowerCase() !== "under" || outcome.point == null) continue;
+            const playerName = outcome.description || outcome.participant || outcome.player || "";
+            const key = `${normalizeName(playerName)}:${statType}`;
+            if (!lineMap.has(key)) {
+              lineMap.set(key, {
+                line: Number(outcome.point),
+                stat_type: statType,
+                bookmaker: bookmaker.key || bookmaker.title || "the_odds_api",
+                price: outcome.price,
+                source: "the_odds_api"
+              });
+            }
+          }
+        }
+      }
+    }
+
+    return lineMap;
+  } catch (error) {
+    console.error("The Odds API sync failed; falling back where needed", error.message);
     return new Map();
   }
 }
@@ -76,4 +139,16 @@ function eventMatchesGame(event, game) {
   const gameAway = normalizeName(game.away_abbreviation || game.away_team || "");
   const gameHome = normalizeName(game.home_abbreviation || game.home_team || "");
   return Boolean(away && home && gameAway && gameHome && away.includes(gameAway) && home.includes(gameHome));
+}
+
+async function oddsApiRequest(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`The Odds API ${response.status}: ${await response.text()}`);
+  return response.json();
+}
+
+function mergeLineMaps(target, source) {
+  for (const [key, value] of source.entries()) {
+    if (!target.has(key)) target.set(key, value);
+  }
 }

@@ -42,6 +42,8 @@ export async function migrate() {
       position TEXT,
       team_id INTEGER REFERENCES teams(id),
       first_tracked_game_date DATE,
+      roster_status TEXT DEFAULT 'roster',
+      last_known_starter BOOLEAN DEFAULT false,
       active BOOLEAN DEFAULT true,
       updated_at TIMESTAMPTZ DEFAULT now()
     );
@@ -105,5 +107,7 @@ export async function migrate() {
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS line_source TEXT DEFAULT 'generated';
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS bookmaker TEXT;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS odds_price NUMERIC;
+    ALTER TABLE players ADD COLUMN IF NOT EXISTS roster_status TEXT DEFAULT 'roster';
+    ALTER TABLE players ADD COLUMN IF NOT EXISTS last_known_starter BOOLEAN DEFAULT false;
   `);
 }

@@ -123,6 +123,8 @@ function toPickDto(row) {
     player_id: row.player_id,
     player_name: row.first_name ? `${row.first_name} ${row.last_name}` : undefined,
     team: row.team_abbreviation,
+    roster_status: row.roster_status,
+    starter: Boolean(row.last_known_starter),
     game_date: dateOnly(row.game_date),
     stat_type: row.stat_type,
     line: Number(row.line),
