@@ -62,7 +62,7 @@ export async function fetchEspnGamesByDate(date, season) {
     const away = competitors.find((team) => team.homeAway === "away");
     return {
       external_id: String(event.id),
-      date: event.date.slice(0, 10),
+      date,
       season: event.season?.year || season,
       status: event.status?.type?.name || "scheduled",
       home_team_external_id: home?.team?.id ? String(home.team.id) : null,
