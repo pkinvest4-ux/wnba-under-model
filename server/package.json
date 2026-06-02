@@ -1,0 +1,26 @@
+{
+  "name": "wnba-under-model-server",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js",
+    "seed": "node scripts/seed.js",
+    "run:daily": "node scripts/runDaily.js",
+    "run:results": "node scripts/reconcileResults.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "node-cron": "^4.0.5",
+    "pg": "^8.15.6",
+    "propline": "^0.11.0",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
