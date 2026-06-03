@@ -392,6 +392,36 @@ h3 {
   font-weight: 800;
 }
 
+.modeBar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid #d3dce8;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.modeBar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #536174;
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.modeBar button.active {
+  background: #1f2937;
+  color: #ffffff;
+}
+
 .ghostButton,
 .detailsButton,
 .trackButton {
@@ -736,6 +766,46 @@ tbody tr.detailRow td {
   background: #eef8f3;
 }
 
+.statusStack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid #cfd8e3;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #536174;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.statusBadge.bettable {
+  border-color: #8fc7ad;
+  background: #e8f8f0;
+  color: #176247;
+}
+
+.statusBadge.watchlist {
+  border-color: #dbc68f;
+  background: #fff8e6;
+  color: #7a5b0b;
+}
+
+.statusBadge.research {
+  border-color: #cfd8e3;
+  background: #eef2f6;
+  color: #536174;
+}
+
 .starterBadge {
   min-height: 18px;
   padding: 2px 6px;
@@ -803,6 +873,18 @@ tbody tr.detailRow td {
 
 .reasonChips.expanded span {
   background: #e8eef5;
+}
+
+.reasonChips.risk span {
+  border: 1px solid #d3dce8;
+  background: #ffffff;
+}
+
+.watchlistText {
+  margin: 9px 0 0;
+  color: #536174;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .pickDetails {
@@ -891,6 +973,26 @@ tbody tr.detailRow td {
   color: #7a5b0b;
   font-size: 12px;
   font-weight: 800;
+}
+
+.movementPanel {
+  display: grid;
+  gap: 5px;
+  min-height: 74px;
+  padding: 12px;
+  border: 1px solid #d8e0ea;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.movementPanel strong {
+  color: #111827;
+  font-size: 15px;
+}
+
+.movementPanel span {
+  color: #657185;
+  font-size: 13px;
 }
 
 .breakdownGrid {

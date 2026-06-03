@@ -6,11 +6,13 @@ import {
   ChevronDown,
   ChevronUp,
   CircleDollarSign,
+  Download,
   Filter,
   LineChart,
   RefreshCw,
   RotateCcw,
   Search,
+  Star,
   TrendingDown,
   Trophy
 } from "lucide-react";
@@ -24,6 +26,8 @@ const EMPTY_FILTERS = {
   source: "all",
   model: "all",
   lineQuality: "all",
+  boardMode: "all",
+  riskTag: "all",
   team: "all",
   starter: "all",
   energy: "all",
@@ -37,6 +41,7 @@ function App() {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedPickId, setExpandedPickId] = useState(null);
+  const [snapshotsByPickId, setSnapshotsByPickId] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -100,6 +105,26 @@ function App() {
     setExpandedPickId(null);
     setSearchTerm("");
     setFilters(EMPTY_FILTERS);
+  }
+
+  async function handleTogglePick(pickId) {
+    const nextId = expandedPickId === pickId ? null : pickId;
+    setExpandedPickId(nextId);
+    if (nextId && !snapshotsByPickId[nextId]) {
+      try {
+        const res = await fetch(`${API}/picks/${nextId}/line-snapshots`);
+        if (res.ok) {
+          const data = await res.json();
+          setSnapshotsByPickId((current) => ({ ...current, [nextId]: data.snapshots || [] }));
+        }
+      } catch {
+        setSnapshotsByPickId((current) => ({ ...current, [nextId]: [] }));
+      }
+    }
+  }
+
+  function exportVisiblePicks() {
+    downloadCsv(`${activeView}-picks-${new Date().toISOString().slice(0, 10)}.csv`, visiblePicks);
   }
 
   return (
@@ -178,9 +203,18 @@ function App() {
                     <Search size={16} />
                     <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Search player, team, stat, reason" />
                   </label>
+                  <div className="modeBar" aria-label="Board mode">
+                    {["all", "bettable", "watchlist", "tracked"].map((mode) => (
+                      <button key={mode} className={filters.boardMode === mode ? "active" : ""} onClick={() => setFilter("boardMode", mode)}>
+                        {mode === "watchlist" && <Star size={13} />}
+                        {filterLabel(mode)}
+                      </button>
+                    ))}
+                  </div>
                   <div className="filterMeta">
                     <Filter size={15} />
                     <span>{activeFilterCount} filters active</span>
+                    <button className="ghostButton" onClick={exportVisiblePicks}><Download size={14} /> Export</button>
                     <button className="ghostButton" onClick={resetFilters}><RotateCcw size={14} /> Reset</button>
                   </div>
                 </div>
@@ -192,6 +226,7 @@ function App() {
                   <SelectFilter label="Stat" value={filters.stat} options={filterOptions.stats} onChange={(value) => setFilter("stat", value)} />
                   <SelectFilter label="Source" value={filters.source} options={filterOptions.sources} onChange={(value) => setFilter("source", value)} />
                   <SelectFilter label="Line Fit" value={filters.lineQuality} options={filterOptions.lineQualities} onChange={(value) => setFilter("lineQuality", value)} />
+                  <SelectFilter label="Risk Tag" value={filters.riskTag} options={filterOptions.riskTags} onChange={(value) => setFilter("riskTag", value)} />
                   <SelectFilter label="Model" value={filters.model} options={filterOptions.models} onChange={(value) => setFilter("model", value)} />
                   <SelectFilter label="Team" value={filters.team} options={filterOptions.teams} onChange={(value) => setFilter("team", value)} />
                   <SelectFilter label="Starter" value={filters.starter} options={["all", "starter", "bench"]} onChange={(value) => setFilter("starter", value)} />
@@ -210,7 +245,8 @@ function App() {
                   loading={loading}
                   activeView={activeView}
                   expandedPickId={expandedPickId}
-                  onToggle={(pickId) => setExpandedPickId((current) => current === pickId ? null : pickId)}
+                  snapshotsByPickId={snapshotsByPickId}
+                  onToggle={handleTogglePick}
                   onTrack={toggleTrackedBet}
                 />
               </div>
@@ -231,6 +267,8 @@ function FinancialAnalytics({ analytics, summary }) {
         <InsightCard label="Worst Day" value={analytics.worstDay ? formatCurrency(analytics.worstDay.profitDollars) : "$0"} detail={analytics.worstDay ? `${formatDate(analytics.worstDay.date)} · ${analytics.worstDay.record}` : "No graded days yet"} tone="negative" />
         <InsightCard label="Best Player" value={analytics.topPlayers[0]?.name || "n/a"} detail={analytics.topPlayers[0] ? `${formatCurrency(analytics.topPlayers[0].profitDollars)} · ${analytics.topPlayers[0].record}` : "No graded players yet"} tone="positive" />
         <InsightCard label="Tracked Bets" value={formatCurrency(analytics.tracked.profitDollars)} detail={`${analytics.tracked.record} · ${analytics.tracked.graded} graded`} tone={analytics.tracked.profitDollars >= 0 ? "positive" : "negative"} />
+        <InsightCard label="Real-Line Picks" value={`${analytics.marketOnly.hitRate}%`} detail={`${analytics.marketOnly.record} · ${formatCurrency(analytics.marketOnly.profitDollars)}`} tone={analytics.marketOnly.profitDollars >= 0 ? "positive" : "negative"} />
+        <InsightCard label="Bettable Slice" value={`${analytics.bettableOnly.hitRate}%`} detail={`${analytics.bettableOnly.record} · ${formatCurrency(analytics.bettableOnly.profitDollars)}`} tone={analytics.bettableOnly.profitDollars >= 0 ? "positive" : "negative"} />
       </div>
 
       <div className="analyticsGrid">
@@ -266,6 +304,12 @@ function FinancialAnalytics({ analytics, summary }) {
         <SliceTable title="By Stat" rows={analytics.byStat} />
         <SliceTable title="By Source" rows={analytics.bySource} />
         <SliceTable title="By Model" rows={analytics.byModel} />
+      </div>
+
+      <div className="analyticsGrid three">
+        <SliceTable title="By Line Fit" rows={analytics.byLineFit} />
+        <SliceTable title="By Board Status" rows={analytics.byStatus} />
+        <SliceTable title="Confidence Calibration" rows={analytics.byConfidence} />
       </div>
     </div>
   );
@@ -366,7 +410,7 @@ function SliceTable({ title, rows }) {
   );
 }
 
-function PickBoard({ picks, loading, activeView, expandedPickId, onToggle, onTrack }) {
+function PickBoard({ picks, loading, activeView, expandedPickId, snapshotsByPickId, onToggle, onTrack }) {
   const showResult = activeView === "history";
   const colSpan = showResult ? 10 : 9;
 
@@ -379,7 +423,7 @@ function PickBoard({ picks, loading, activeView, expandedPickId, onToggle, onTra
           <th>Stat Line</th>
           {showResult && <th>Result</th>}
           <th>Source</th>
-          <th>Model</th>
+          <th>Status</th>
           <th>Why</th>
           <th>Confidence</th>
           <th>Energy Index</th>
@@ -403,7 +447,7 @@ function PickBoard({ picks, loading, activeView, expandedPickId, onToggle, onTra
                 <td><LineCell pick={pick} /></td>
                 {showResult && <td><OutcomeBadge outcome={pick.outcome} value={pick.result_value} /></td>}
                 <td><SourceBadge pick={pick} /></td>
-                <td><ModelBadge version={pick.model_version} /></td>
+                <td><StatusStack pick={pick} /></td>
                 <td><ReasonChips reasons={pick.reasons} formula={pick.formula_summary} breakdown={pick.factor_breakdown} /></td>
                 <td><Confidence value={pick.confidence_score} /></td>
                 <td><Energy value={pick.energy_index} /></td>
@@ -421,7 +465,7 @@ function PickBoard({ picks, loading, activeView, expandedPickId, onToggle, onTra
               {expanded && (
                 <tr className="detailRow">
                   <td colSpan={colSpan}>
-                    <PickDetails pick={pick} />
+                    <PickDetails pick={pick} snapshots={snapshotsByPickId[pick.id] || []} />
                   </td>
                 </tr>
               )}
@@ -433,7 +477,7 @@ function PickBoard({ picks, loading, activeView, expandedPickId, onToggle, onTra
   );
 }
 
-function PickDetails({ pick }) {
+function PickDetails({ pick, snapshots = [] }) {
   return (
     <div className="pickDetails">
       <div className="detailSummary">
@@ -444,6 +488,7 @@ function PickDetails({ pick }) {
         </div>
         <div className="detailBadges">
           <SourceBadge pick={pick} />
+          <StatusBadge status={pick.bettable_status} />
           <ModelBadge version={pick.model_version} />
           <OutcomeBadge outcome={pick.outcome} value={pick.result_value} />
         </div>
@@ -455,6 +500,7 @@ function PickDetails({ pick }) {
         <DetailStat label="Model Est." value={pick.estimated_line ?? "n/a"} />
         <DetailStat label="Real Line" value={pick.real_line ?? "n/a"} />
         <DetailStat label="Line Gap" value={pick.line_gap ?? "n/a"} />
+        <DetailStat label="Board Status" value={filterLabel(pick.bettable_status || "research")} />
         <DetailStat label="Odds Price" value={pick.odds_price ?? "n/a"} />
         <DetailStat label="Under Hit Rate" value={formatPercent(pick.under_hit_rate)} />
         <DetailStat label="Recent Minutes" value={formatNumber(pick.recent_minutes_avg)} />
@@ -471,6 +517,17 @@ function PickDetails({ pick }) {
             {[...(pick.line_alerts || []), ...(pick.reasons?.length ? pick.reasons : ["Model signal"])].map((reason) => <span key={reason}>{reason}</span>)}
           </div>
         </div>
+        <div>
+          <p className="detailTitle">Risk Tags</p>
+          <div className="reasonChips expanded risk">
+            {(pick.risk_tags?.length ? pick.risk_tags : ["No major risk tag"]).map((tag) => <span key={tag}>{tag}</span>)}
+          </div>
+          <p className="watchlistText">{pick.watchlist_reason || "Stored as a research signal for later optimization."}</p>
+        </div>
+      </div>
+
+      <div className="detailColumns">
+        <LineMovement snapshots={snapshots} />
         <div>
           <p className="detailTitle">Formula</p>
           <p className="formulaText">{pick.formula_summary || "confidence = model score from weighted player, rest, load, matchup, and historical signals"}</p>
@@ -492,6 +549,27 @@ function PickDetails({ pick }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function LineMovement({ snapshots }) {
+  const first = snapshots[0];
+  const latest = snapshots[snapshots.length - 1];
+  const delta = first && latest ? Number((Number(latest.observed_line) - Number(first.observed_line)).toFixed(2)) : 0;
+  const label = !snapshots.length ? "No snapshots yet" : delta === 0 ? "No movement" : delta > 0 ? `Up ${delta}` : `Down ${Math.abs(delta)}`;
+
+  return (
+    <div>
+      <p className="detailTitle">Line Movement</p>
+      <div className="movementPanel">
+        <strong>{label}</strong>
+        <span>
+          {snapshots.length
+            ? `${snapshots.length} snapshots · first ${first.observed_line} · latest ${latest.observed_line}`
+            : "Refreshes will store line checks here."}
+        </span>
+      </div>
     </div>
   );
 }
@@ -591,6 +669,19 @@ function SourceBadge({ pick }) {
   );
 }
 
+function StatusStack({ pick }) {
+  return (
+    <div className="statusStack">
+      <StatusBadge status={pick.bettable_status} />
+      <ModelBadge version={pick.model_version} />
+    </div>
+  );
+}
+
+function StatusBadge({ status = "research" }) {
+  return <span className={`statusBadge ${status}`}>{filterLabel(status)}</span>;
+}
+
 function ModelBadge({ version }) {
   const learned = version?.startsWith("learned");
   return (
@@ -626,9 +717,13 @@ function applyFilters(picks, filters, searchTerm, activeView) {
   return picks.filter((pick) => {
     const outcome = pick.outcome || "pending";
     if (activeView === "history" && filters.outcome !== "all" && outcome !== filters.outcome) return false;
+    if (filters.boardMode === "bettable" && pick.bettable_status !== "bettable") return false;
+    if (filters.boardMode === "watchlist" && pick.bettable_status !== "watchlist") return false;
+    if (filters.boardMode === "tracked" && !pick.tracked_bet) return false;
     if (filters.stat !== "all" && pick.stat_type !== filters.stat) return false;
     if (filters.source !== "all" && sourceKey(pick) !== filters.source) return false;
     if (filters.lineQuality !== "all" && (pick.line_match_quality || "model_only") !== filters.lineQuality) return false;
+    if (filters.riskTag !== "all" && !(pick.risk_tags || []).includes(filters.riskTag)) return false;
     if (filters.model !== "all" && modelKey(pick) !== filters.model) return false;
     if (filters.team !== "all" && pick.team !== filters.team) return false;
     if (filters.starter === "starter" && !pick.starter) return false;
@@ -644,8 +739,11 @@ function applyFilters(picks, filters, searchTerm, activeView) {
       pick.line_source,
       pick.bookmaker,
       pick.model_version,
+      pick.bettable_status,
+      pick.watchlist_reason,
       pick.energy_index,
-      ...(pick.reasons || [])
+      ...(pick.reasons || []),
+      ...(pick.risk_tags || [])
     ].filter(Boolean).join(" ").toLowerCase().includes(needle);
   });
 }
@@ -655,6 +753,7 @@ function buildFilterOptions(picks) {
     stats: ["all", ...uniqueSorted(picks.map((pick) => pick.stat_type))],
     sources: ["all", ...uniqueSorted(picks.map(sourceKey))],
     lineQualities: ["all", ...uniqueSorted(picks.map((pick) => pick.line_match_quality || "model_only"))],
+    riskTags: ["all", ...uniqueSorted(picks.flatMap((pick) => pick.risk_tags || []))],
     models: ["all", ...uniqueSorted(picks.map(modelKey))],
     teams: ["all", ...uniqueSorted(picks.map((pick) => pick.team).filter(Boolean))],
     energy: ["all", ...["low", "medium", "high"].filter((band) => picks.some((pick) => pick.energy_index === band))]
@@ -670,6 +769,9 @@ function buildFinancialAnalytics(picks, summary = {}) {
   const statMap = new Map();
   const sourceMap = new Map();
   const modelMap = new Map();
+  const lineFitMap = new Map();
+  const statusMap = new Map();
+  const confidenceMap = new Map();
 
   for (const pick of graded) {
     const profitUnits = pickProfitUnits(pick, winProfitUnits);
@@ -679,6 +781,9 @@ function buildFinancialAnalytics(picks, summary = {}) {
     addAggregate(statMap, pick.stat_type, pick, profitUnits, profitDollars);
     addAggregate(sourceMap, sourceKey(pick), pick, profitUnits, profitDollars);
     addAggregate(modelMap, modelKey(pick), pick, profitUnits, profitDollars);
+    addAggregate(lineFitMap, pick.line_match_quality || "model_only", pick, profitUnits, profitDollars);
+    addAggregate(statusMap, pick.bettable_status || "research", pick, profitUnits, profitDollars);
+    addAggregate(confidenceMap, confidenceBucket(pick.confidence_score), pick, profitUnits, profitDollars);
   }
 
   let cumulativeUnits = 0;
@@ -701,6 +806,9 @@ function buildFinancialAnalytics(picks, summary = {}) {
   const byStat = [...statMap.values()].map(finalizeAggregate).sort(byProfitDesc);
   const bySource = [...sourceMap.values()].map(finalizeAggregate).sort(byProfitDesc);
   const byModel = [...modelMap.values()].map(finalizeAggregate).sort(byProfitDesc);
+  const byLineFit = [...lineFitMap.values()].map(finalizeAggregate).sort(byProfitDesc);
+  const byStatus = [...statusMap.values()].map(finalizeAggregate).sort(byProfitDesc);
+  const byConfidence = [...confidenceMap.values()].map(finalizeAggregate).sort((a, b) => confidenceSortValue(a.name) - confidenceSortValue(b.name));
   const netProfitUnits = graded.reduce((total, pick) => total + pickProfitUnits(pick, winProfitUnits), 0);
   const tracked = finalizeAggregate(graded.filter((pick) => pick.tracked_bet).reduce((row, pick) => {
     const units = pickProfitUnits(pick, winProfitUnits);
@@ -711,6 +819,8 @@ function buildFinancialAnalytics(picks, summary = {}) {
     row.profitDollars += units * Number(pick.tracked_stake || unitSize);
     return row;
   }, { name: "tracked", wins: 0, losses: 0, graded: 0, profitUnits: 0, profitDollars: 0 }));
+  const marketOnly = aggregatePickList(graded.filter(isRealLine), winProfitUnits, unitSize, "real-line");
+  const bettableOnly = aggregatePickList(graded.filter((pick) => pick.bettable_status === "bettable"), winProfitUnits, unitSize, "bettable");
 
   return {
     gradedCount: graded.length,
@@ -724,7 +834,12 @@ function buildFinancialAnalytics(picks, summary = {}) {
     byStat,
     bySource,
     byModel,
+    byLineFit,
+    byStatus,
+    byConfidence,
     tracked,
+    marketOnly,
+    bettableOnly,
     maxDailyAbs: Math.max(1, ...daily.map((row) => Math.abs(row.profitDollars))),
     maxCumulativeAbs: Math.max(1, ...daily.map((row) => Math.abs(row.cumulativeDollars)))
   };
@@ -750,6 +865,19 @@ function addAggregate(map, key, pick, profitUnits, profitDollars) {
   row.profitDollars += profitDollars;
 }
 
+function aggregatePickList(picks, winProfitUnits, unitSize, name) {
+  const row = picks.reduce((current, pick) => {
+    const units = pickProfitUnits(pick, winProfitUnits);
+    current.wins += pick.outcome === "hit" ? 1 : 0;
+    current.losses += pick.outcome === "miss" ? 1 : 0;
+    current.graded += 1;
+    current.profitUnits += units;
+    current.profitDollars += units * unitSize;
+    return current;
+  }, { name, wins: 0, losses: 0, graded: 0, profitUnits: 0, profitDollars: 0 });
+  return finalizeAggregate(row);
+}
+
 function finalizeAggregate(row) {
   const wins = row.wins || 0;
   const losses = row.losses || 0;
@@ -764,6 +892,23 @@ function finalizeAggregate(row) {
     hitRate: graded ? Number(((wins / graded) * 100).toFixed(1)) : 0,
     record: `${wins}-${losses}`
   };
+}
+
+function confidenceBucket(value) {
+  const score = Number(value || 0);
+  if (score >= 90) return "90+";
+  if (score >= 85) return "85-89";
+  if (score >= 80) return "80-84";
+  if (score >= 75) return "75-79";
+  if (score >= 70) return "70-74";
+  if (score >= 65) return "65-69";
+  return "<65";
+}
+
+function confidenceSortValue(bucket) {
+  if (bucket === "<65") return 0;
+  if (bucket === "90+") return 90;
+  return Number(String(bucket).split("-")[0]) || 0;
 }
 
 function pickProfitUnits(pick, winProfitUnits) {
@@ -862,6 +1007,51 @@ function formatPercent(value) {
 
 function historySubtitle(summary = {}) {
   return `${summary.settled || 0} resolved · ${summary.wins || 0}-${summary.losses || 0}-${summary.pushes || 0} · ${summary.voids || 0} void · ${formatCurrency(summary.estimated_profit_dollars || 0)}`;
+}
+
+function downloadCsv(filename, picks) {
+  const columns = [
+    "id",
+    "game_date",
+    "player_name",
+    "team",
+    "stat_type",
+    "line",
+    "estimated_line",
+    "real_line",
+    "line_gap",
+    "line_match_quality",
+    "line_source",
+    "bettable_status",
+    "watchlist_reason",
+    "confidence_score",
+    "energy_index",
+    "model_version",
+    "under_hit_rate",
+    "recent_minutes_avg",
+    "days_rest",
+    "back_to_back",
+    "reasons",
+    "risk_tags",
+    "tracked_bet",
+    "outcome",
+    "result_value"
+  ];
+  const rows = [columns.join(",")].concat((picks || []).map((pick) => columns.map((column) => csvValue(Array.isArray(pick[column]) ? pick[column].join("|") : pick[column])).join(",")));
+  const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function csvValue(value) {
+  if (value === null || value === undefined) return "";
+  return `"${String(value).replaceAll('"', '""')}"`;
 }
 
 createRoot(document.getElementById("root")).render(<App />);

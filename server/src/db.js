@@ -108,6 +108,9 @@ export async function migrate() {
       line_gap NUMERIC,
       line_match_quality TEXT DEFAULT 'model_only',
       line_alerts JSONB DEFAULT '[]'::jsonb,
+      bettable_status TEXT DEFAULT 'research',
+      watchlist_reason TEXT,
+      risk_tags JSONB DEFAULT '[]'::jsonb,
       tracked_bet BOOLEAN DEFAULT false,
       tracked_stake NUMERIC,
       tracked_at TIMESTAMPTZ,
@@ -163,6 +166,9 @@ export async function migrate() {
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS line_gap NUMERIC;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS line_match_quality TEXT DEFAULT 'model_only';
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS line_alerts JSONB DEFAULT '[]'::jsonb;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS bettable_status TEXT DEFAULT 'research';
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS watchlist_reason TEXT;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS risk_tags JSONB DEFAULT '[]'::jsonb;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS tracked_bet BOOLEAN DEFAULT false;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS tracked_stake NUMERIC;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS tracked_at TIMESTAMPTZ;

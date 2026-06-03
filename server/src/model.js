@@ -137,6 +137,8 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
     const { confidence_score, model_version } = scoreUnderWithWeights(allFeatures, weightsByStat, statType);
     const factor_breakdown = factorBreakdown(allFeatures, weightsByStat?.[statType]);
     const reasons = pickReasons(allFeatures, factor_breakdown);
+    const risk_tags = riskTags({ confidence_score, sortedLogs, allFeatures, lineMatchQuality, realLine });
+    const classification = classifyPick({ confidence_score, lineMatchQuality, realLine, lineGap, risk_tags });
 
     return {
       stat_type: statType,
@@ -146,6 +148,9 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
       line_gap: lineGap,
       line_match_quality: lineMatchQuality,
       line_alerts: lineAlerts({ realLine, lineGap, lineMatchQuality }),
+      bettable_status: classification.bettable_status,
+      watchlist_reason: classification.watchlist_reason,
+      risk_tags,
       confidence_score,
       fatigue_cycle_score,
       energy_band: energyBand(fatigue_cycle_score),
@@ -182,6 +187,44 @@ function lineAlerts({ realLine, lineGap, lineMatchQuality }) {
   if (lineMatchQuality === "close_market") alerts.push("Close to model line");
   if (lineMatchQuality === "wide_gap") alerts.push(`Market gap ${lineGap > 0 ? "+" : ""}${lineGap}`);
   return alerts;
+}
+
+function classifyPick({ confidence_score, lineMatchQuality, realLine, lineGap, risk_tags }) {
+  const hasRealLine = realLine != null;
+  const confidence = Number(confidence_score || 0);
+  const marketFit = lineMatchQuality === "near_market" || lineMatchQuality === "close_market";
+  const wideGap = lineMatchQuality === "wide_gap";
+  const lowSample = risk_tags.includes("Low sample");
+  const minutesRisk = risk_tags.includes("Minutes uncertainty");
+
+  if (hasRealLine && marketFit && confidence >= 72 && !lowSample && !minutesRisk) {
+    return { bettable_status: "bettable", watchlist_reason: "Real line with usable model fit" };
+  }
+  if (hasRealLine && confidence >= 75) {
+    return {
+      bettable_status: "watchlist",
+      watchlist_reason: wideGap ? `Real line, but model gap ${lineGap > 0 ? "+" : ""}${lineGap}` : "Real line with caution tags"
+    };
+  }
+  if (!hasRealLine && confidence >= 75) {
+    return { bettable_status: "watchlist", watchlist_reason: "Strong model signal waiting on market line" };
+  }
+  return { bettable_status: "research", watchlist_reason: "Research-only signal" };
+}
+
+function riskTags({ confidence_score, sortedLogs, allFeatures, lineMatchQuality, realLine }) {
+  const tags = [];
+  if (realLine == null) tags.push("Model line only");
+  if (lineMatchQuality === "wide_gap") tags.push("Wide market gap");
+  if (lineMatchQuality === "near_market" || lineMatchQuality === "close_market") tags.push("Market aligned");
+  if (Number(confidence_score || 0) >= 85) tags.push("High confidence");
+  if ((sortedLogs || []).length < 5) tags.push("Low sample");
+  if (Number(allFeatures.recent_minutes_avg || 0) < 8) tags.push("Minutes uncertainty");
+  if (Number(allFeatures.recent_minutes_avg || 0) >= 30) tags.push("Heavy minutes");
+  if (Number(allFeatures.days_rest) <= 1) tags.push("Short rest");
+  if (allFeatures.back_to_back) tags.push("B2B");
+  if (Number(allFeatures.under_hit_rate || 0) >= 0.7) tags.push("Strong under history");
+  return [...new Set(tags)].slice(0, 8);
 }
 
 export function pickReasons(features, breakdown = []) {
