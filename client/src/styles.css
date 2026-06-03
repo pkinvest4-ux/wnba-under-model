@@ -163,6 +163,35 @@ h3 {
   font-size: 13px;
 }
 
+.segmented {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid #cdd5df;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.segmented button {
+  min-width: 76px;
+  min-height: 34px;
+  border: 0;
+  border-right: 1px solid #cdd5df;
+  background: transparent;
+  color: #4b5565;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.segmented button:last-child {
+  border-right: 0;
+}
+
+.segmented button.active {
+  background: #263241;
+  color: #ffffff;
+}
+
 .tableWrap {
   overflow-x: auto;
 }
@@ -291,6 +320,39 @@ td span {
   font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
+}
+
+.outcomeBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid #cdd5df;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #4b5565;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.outcomeBadge.hit {
+  border-color: #a8d1bd;
+  background: #eef8f3;
+  color: #1f6848;
+}
+
+.outcomeBadge.miss {
+  border-color: #e4b8ac;
+  background: #fff2ef;
+  color: #873724;
+}
+
+.outcomeBadge.push {
+  border-color: #dbc68f;
+  background: #fff8e6;
+  color: #7a5b0b;
 }
 
 .reasonChips {

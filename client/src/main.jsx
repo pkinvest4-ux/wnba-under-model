@@ -9,6 +9,7 @@ const API = import.meta.env.VITE_API_URL || "";
 function App() {
   const [today, setToday] = useState({ date: "", picks: [] });
   const [history, setHistory] = useState({ summary: {}, picks: [] });
+  const [activeView, setActiveView] = useState("today");
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [trend, setTrend] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -78,50 +79,31 @@ function App() {
         <div className="panel picksPanel">
           <div className="panelHeader">
             <div>
-              <h2>Today's Picks</h2>
-              <p>{today.date ? formatDate(today.date) : "Loading"}</p>
+              <h2>{activeView === "today" ? "Today's Picks" : "Pick History"}</h2>
+              <p>{activeView === "today" ? (today.date ? formatDate(today.date) : "Loading") : historySubtitle(history.summary)}</p>
+            </div>
+            <div className="segmented" aria-label="Pick view">
+              <button className={activeView === "today" ? "active" : ""} onClick={() => setActiveView("today")}>Today</button>
+              <button className={activeView === "history" ? "active" : ""} onClick={() => setActiveView("history")}>History</button>
             </div>
           </div>
           <div className="tableWrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Player</th>
-                  <th>Stat Line</th>
-                  <th>Source</th>
-                  <th>Model</th>
-                  <th>Why</th>
-                  <th>Confidence</th>
-                  <th>Energy Index</th>
-                </tr>
-              </thead>
-              <tbody>
-                {!loading && today.picks?.length === 0 && (
-                  <tr>
-                    <td colSpan="7" className="empty">No value unders are flagged for today.</td>
-                  </tr>
-                )}
-                {today.picks?.map((pick) => (
-                  <tr key={pick.id} onClick={() => openPlayer(pick.player_id)} className={selectedPlayer === pick.player_id ? "selected" : ""}>
-                    <td>
-                      <strong>{pick.player_name} {pick.starter && <span className="starterBadge">Starter</span>}</strong>
-                      <span>{pick.team}</span>
-                    </td>
-                    <td>{statLabel(pick.stat_type)} under {pick.line}</td>
-                    <td><SourceBadge pick={pick} /></td>
-                    <td><ModelBadge version={pick.model_version} /></td>
-                    <td><ReasonChips reasons={pick.reasons} formula={pick.formula_summary} breakdown={pick.factor_breakdown} /></td>
-                    <td>
-                      <div className="score">
-                        <span>{pick.confidence_score}</span>
-                        <div><i style={{ width: `${pick.confidence_score}%` }} /></div>
-                      </div>
-                    </td>
-                    <td><Energy value={pick.energy_index} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {activeView === "today" ? (
+              <PickTable
+                picks={today.picks || []}
+                emptyText="No value unders are flagged for today."
+                loading={loading}
+                selectedPlayer={selectedPlayer}
+                onPlayerClick={openPlayer}
+              />
+            ) : (
+              <HistoryTable
+                picks={history.picks || []}
+                loading={loading}
+                selectedPlayer={selectedPlayer}
+                onPlayerClick={openPlayer}
+              />
+            )}
           </div>
         </div>
 
@@ -171,6 +153,94 @@ function App() {
   );
 }
 
+function PickTable({ picks, emptyText, loading, selectedPlayer, onPlayerClick }) {
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th>Player</th>
+          <th>Stat Line</th>
+          <th>Source</th>
+          <th>Model</th>
+          <th>Why</th>
+          <th>Confidence</th>
+          <th>Energy Index</th>
+        </tr>
+      </thead>
+      <tbody>
+        {!loading && picks.length === 0 && (
+          <tr>
+            <td colSpan="7" className="empty">{emptyText}</td>
+          </tr>
+        )}
+        {picks.map((pick) => (
+          <tr key={pick.id} onClick={() => onPlayerClick(pick.player_id)} className={selectedPlayer === pick.player_id ? "selected" : ""}>
+            <td>
+              <strong>{pick.player_name} {pick.starter && <span className="starterBadge">Starter</span>}</strong>
+              <span>{pick.team}</span>
+            </td>
+            <td>{statLabel(pick.stat_type)} under {pick.line}</td>
+            <td><SourceBadge pick={pick} /></td>
+            <td><ModelBadge version={pick.model_version} /></td>
+            <td><ReasonChips reasons={pick.reasons} formula={pick.formula_summary} breakdown={pick.factor_breakdown} /></td>
+            <td>
+              <div className="score">
+                <span>{pick.confidence_score}</span>
+                <div><i style={{ width: `${pick.confidence_score}%` }} /></div>
+              </div>
+            </td>
+            <td><Energy value={pick.energy_index} /></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function HistoryTable({ picks, loading, selectedPlayer, onPlayerClick }) {
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Player</th>
+          <th>Stat Line</th>
+          <th>Result</th>
+          <th>Source</th>
+          <th>Why</th>
+          <th>Confidence</th>
+        </tr>
+      </thead>
+      <tbody>
+        {!loading && picks.length === 0 && (
+          <tr>
+            <td colSpan="7" className="empty">No past picks have been stored yet.</td>
+          </tr>
+        )}
+        {picks.map((pick) => (
+          <tr key={pick.id} onClick={() => onPlayerClick(pick.player_id)} className={selectedPlayer === pick.player_id ? "selected" : ""}>
+            <td>{formatDate(pick.game_date)}</td>
+            <td>
+              <strong>{pick.player_name} {pick.starter && <span className="starterBadge">Starter</span>}</strong>
+              <span>{pick.team}</span>
+            </td>
+            <td>{statLabel(pick.stat_type)} under {pick.line}</td>
+            <td><OutcomeBadge outcome={pick.outcome} value={pick.result_value} /></td>
+            <td><SourceBadge pick={pick} /></td>
+            <td><ReasonChips reasons={pick.reasons} formula={pick.formula_summary} breakdown={pick.factor_breakdown} /></td>
+            <td>
+              <div className="score">
+                <span>{pick.confidence_score}</span>
+                <div><i style={{ width: `${pick.confidence_score}%` }} /></div>
+              </div>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 function Metric({ icon, label, value }) {
   return (
     <div className="metric">
@@ -209,6 +279,15 @@ function ModelBadge({ version }) {
   );
 }
 
+function OutcomeBadge({ outcome, value }) {
+  const label = outcome ? outcome : "pending";
+  return (
+    <span className={`outcomeBadge ${label}`}>
+      {label}{value !== null && value !== undefined ? ` ${value}` : ""}
+    </span>
+  );
+}
+
 function ReasonChips({ reasons = [], formula, breakdown = [] }) {
   const title = [
     formula,
@@ -232,6 +311,10 @@ function formatDate(date) {
 
 function formatCurrency(value) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(value || 0));
+}
+
+function historySubtitle(summary = {}) {
+  return `${summary.settled || 0} settled · ${summary.wins || 0}-${summary.losses || 0}-${summary.pushes || 0} · ${formatCurrency(summary.estimated_profit_dollars || 0)}`;
 }
 
 createRoot(document.getElementById("root")).render(<App />);
