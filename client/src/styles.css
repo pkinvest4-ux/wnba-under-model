@@ -912,6 +912,268 @@ tbody tr.detailRow td {
   background: #1f5aa6;
 }
 
+.analyticsView {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  background: #fbfcfe;
+}
+
+.analyticsCards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.insightCard,
+.analyticsPanel {
+  border: 1px solid #d8e0ea;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.insightCard {
+  display: grid;
+  gap: 4px;
+  min-height: 112px;
+  padding: 15px;
+}
+
+.insightCard p {
+  margin-bottom: 0;
+  color: #657185;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.insightCard strong {
+  overflow: hidden;
+  color: #111827;
+  font-size: 24px;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insightCard span {
+  color: #657185;
+  font-size: 13px;
+}
+
+.insightCard.positive {
+  border-color: #b7dbc8;
+  background: #f3fbf6;
+}
+
+.insightCard.negative {
+  border-color: #e8c1b7;
+  background: #fff6f3;
+}
+
+.analyticsGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.7fr);
+  gap: 16px;
+}
+
+.analyticsGrid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.analyticsPanel {
+  overflow: hidden;
+}
+
+.analyticsPanel.wide {
+  min-height: 320px;
+}
+
+.analyticsHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid #edf1f5;
+}
+
+.analyticsHeader h3 {
+  margin: 0;
+  color: #111827;
+  font-size: 17px;
+  text-transform: none;
+}
+
+.analyticsHeader > span {
+  color: #657185;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.dailyChart {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(86px, 1fr);
+  gap: 10px;
+  min-height: 260px;
+  padding: 18px;
+  overflow-x: auto;
+}
+
+.dailyBarWrap {
+  display: grid;
+  grid-template-rows: 24px 1fr 20px;
+  justify-items: center;
+  gap: 8px;
+  min-width: 86px;
+}
+
+.dailyBarWrap span,
+.dailyBarWrap small {
+  color: #536174;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.barTrack {
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  width: 46px;
+  height: 180px;
+  border-radius: 8px;
+  background: #eef2f6;
+}
+
+.barTrack i {
+  display: block;
+  width: 100%;
+  min-height: 8px;
+  border-radius: 8px;
+}
+
+.barTrack i.up,
+.cumulativeRow i.up {
+  background: #237a58;
+}
+
+.barTrack i.down,
+.cumulativeRow i.down {
+  background: #b04a34;
+}
+
+.cumulativeList {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.cumulativeRow {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 74px;
+  align-items: center;
+  gap: 9px;
+}
+
+.cumulativeRow span,
+.cumulativeRow strong {
+  color: #536174;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.cumulativeRow strong {
+  color: #111827;
+  text-align: right;
+}
+
+.cumulativeRow div {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #e4e9f0;
+}
+
+.cumulativeRow i {
+  display: block;
+  height: 100%;
+  min-width: 4px;
+  border-radius: inherit;
+}
+
+.leaderboard,
+.sliceTable {
+  display: grid;
+}
+
+.leaderRow,
+.sliceRow {
+  display: grid;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #edf1f5;
+}
+
+.leaderRow {
+  grid-template-columns: 28px minmax(0, 1fr) 82px;
+}
+
+.sliceRow {
+  grid-template-columns: minmax(0, 1fr) 86px 82px;
+}
+
+.leaderRow:last-child,
+.sliceRow:last-child {
+  border-bottom: 0;
+}
+
+.rank {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #eef3f7;
+  color: #536174;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.leaderRow strong,
+.sliceRow strong {
+  color: #111827;
+  font-size: 14px;
+}
+
+.leaderRow span,
+.sliceRow span {
+  color: #657185;
+  font-size: 12px;
+}
+
+.leaderRow b,
+.sliceRow b {
+  font-size: 13px;
+  text-align: right;
+}
+
+.positiveText {
+  color: #1f6848;
+}
+
+.negativeText {
+  color: #9b3c2b;
+}
+
+.emptyAnalytics {
+  padding: 22px 16px;
+  color: #657185;
+  font-size: 13px;
+  text-align: center;
+}
+
 @media (max-width: 1120px) {
   .metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -923,6 +1185,12 @@ tbody tr.detailRow td {
 
   .tableWrap {
     max-height: 640px;
+  }
+
+  .analyticsCards,
+  .analyticsGrid,
+  .analyticsGrid.three {
+    grid-template-columns: 1fr 1fr;
   }
 }
 
@@ -1000,8 +1268,15 @@ tbody tr.detailRow td {
   }
 
   .detailGrid,
-  .breakdownGrid {
+  .breakdownGrid,
+  .analyticsCards,
+  .analyticsGrid,
+  .analyticsGrid.three {
     grid-template-columns: 1fr;
+  }
+
+  .sliceRow {
+    grid-template-columns: minmax(0, 1fr) 76px 72px;
   }
 
   .tableWrap {

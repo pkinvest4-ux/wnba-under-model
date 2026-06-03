@@ -7,6 +7,7 @@ import {
   ChevronUp,
   CircleDollarSign,
   Filter,
+  LineChart,
   RefreshCw,
   RotateCcw,
   Search,
@@ -70,6 +71,7 @@ function App() {
 
   const filterOptions = useMemo(() => buildFilterOptions(activePicks), [activePicks]);
   const visiblePicks = useMemo(() => applyFilters(activePicks, filters, searchTerm, activeView), [activePicks, filters, searchTerm, activeView]);
+  const analytics = useMemo(() => buildFinancialAnalytics(historyPicks, summary), [historyPicks, summary]);
   const activeFilterCount = countActiveFilters(filters, searchTerm, activeView);
 
   function setFilter(key, value) {
@@ -134,61 +136,213 @@ function App() {
         <div className="panel picksPanel">
           <div className="panelHeader">
             <div>
-              <p className="sectionLabel">{activeView === "today" ? "Live Card" : "Results Ledger"}</p>
-              <h2>{activeView === "today" ? "Today's Picks" : "Pick History"}</h2>
+              <p className="sectionLabel">{activeView === "today" ? "Live Card" : activeView === "history" ? "Results Ledger" : "Financials"}</p>
+              <h2>{activeView === "today" ? "Today's Picks" : activeView === "history" ? "Pick History" : "Financial Breakdown"}</h2>
               <span>
-                {visiblePicks.length} shown · {activeView === "today" ? `${todayPicks.length} active rows` : historySubtitle(summary)}
+                {activeView === "analytics"
+                  ? `${analytics.gradedCount} graded · ${formatCurrency(analytics.netProfitDollars)} net`
+                  : `${visiblePicks.length} shown · ${activeView === "today" ? `${todayPicks.length} active rows` : historySubtitle(summary)}`}
               </span>
             </div>
             <div className="segmented" aria-label="Pick view">
               <button className={activeView === "today" ? "active" : ""} onClick={() => { setActiveView("today"); setExpandedPickId(null); }}>Today</button>
               <button className={activeView === "history" ? "active" : ""} onClick={() => { setActiveView("history"); setExpandedPickId(null); }}>History</button>
+              <button className={activeView === "analytics" ? "active" : ""} onClick={() => { setActiveView("analytics"); setExpandedPickId(null); }}>Analytics</button>
             </div>
           </div>
 
-          <div className="toolbar stacked">
-            <div className="toolbarTop">
-              <label className="searchBox">
-                <Search size={16} />
-                <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Search player, team, stat, reason" />
-              </label>
-              <div className="filterMeta">
-                <Filter size={15} />
-                <span>{activeFilterCount} filters active</span>
-                <button className="ghostButton" onClick={resetFilters}><RotateCcw size={14} /> Reset</button>
+          {activeView === "analytics" ? (
+            <FinancialAnalytics analytics={analytics} summary={summary} />
+          ) : (
+            <>
+              <div className="toolbar stacked">
+                <div className="toolbarTop">
+                  <label className="searchBox">
+                    <Search size={16} />
+                    <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Search player, team, stat, reason" />
+                  </label>
+                  <div className="filterMeta">
+                    <Filter size={15} />
+                    <span>{activeFilterCount} filters active</span>
+                    <button className="ghostButton" onClick={resetFilters}><RotateCcw size={14} /> Reset</button>
+                  </div>
+                </div>
+
+                <div className="filterGrid">
+                  {activeView === "history" && (
+                    <SegmentedFilter label="Result" value={filters.outcome} options={OUTCOME_FILTERS} onChange={(value) => setFilter("outcome", value)} />
+                  )}
+                  <SelectFilter label="Stat" value={filters.stat} options={filterOptions.stats} onChange={(value) => setFilter("stat", value)} />
+                  <SelectFilter label="Source" value={filters.source} options={filterOptions.sources} onChange={(value) => setFilter("source", value)} />
+                  <SelectFilter label="Model" value={filters.model} options={filterOptions.models} onChange={(value) => setFilter("model", value)} />
+                  <SelectFilter label="Team" value={filters.team} options={filterOptions.teams} onChange={(value) => setFilter("team", value)} />
+                  <SelectFilter label="Starter" value={filters.starter} options={["all", "starter", "bench"]} onChange={(value) => setFilter("starter", value)} />
+                  <SelectFilter label="Energy" value={filters.energy} options={filterOptions.energy} onChange={(value) => setFilter("energy", value)} />
+                  <label className="rangeFilter">
+                    <span>Min Conf</span>
+                    <strong>{filters.minConfidence}</strong>
+                    <input type="range" min="0" max="100" step="1" value={filters.minConfidence} onChange={(event) => setFilter("minConfidence", Number(event.target.value))} />
+                  </label>
+                </div>
               </div>
-            </div>
 
-            <div className="filterGrid">
-              {activeView === "history" && (
-                <SegmentedFilter label="Result" value={filters.outcome} options={OUTCOME_FILTERS} onChange={(value) => setFilter("outcome", value)} />
-              )}
-              <SelectFilter label="Stat" value={filters.stat} options={filterOptions.stats} onChange={(value) => setFilter("stat", value)} />
-              <SelectFilter label="Source" value={filters.source} options={filterOptions.sources} onChange={(value) => setFilter("source", value)} />
-              <SelectFilter label="Model" value={filters.model} options={filterOptions.models} onChange={(value) => setFilter("model", value)} />
-              <SelectFilter label="Team" value={filters.team} options={filterOptions.teams} onChange={(value) => setFilter("team", value)} />
-              <SelectFilter label="Starter" value={filters.starter} options={["all", "starter", "bench"]} onChange={(value) => setFilter("starter", value)} />
-              <SelectFilter label="Energy" value={filters.energy} options={filterOptions.energy} onChange={(value) => setFilter("energy", value)} />
-              <label className="rangeFilter">
-                <span>Min Conf</span>
-                <strong>{filters.minConfidence}</strong>
-                <input type="range" min="0" max="100" step="1" value={filters.minConfidence} onChange={(event) => setFilter("minConfidence", Number(event.target.value))} />
-              </label>
-            </div>
-          </div>
-
-          <div className="tableWrap">
-            <PickBoard
-              picks={visiblePicks}
-              loading={loading}
-              activeView={activeView}
-              expandedPickId={expandedPickId}
-              onToggle={(pickId) => setExpandedPickId((current) => current === pickId ? null : pickId)}
-            />
-          </div>
+              <div className="tableWrap">
+                <PickBoard
+                  picks={visiblePicks}
+                  loading={loading}
+                  activeView={activeView}
+                  expandedPickId={expandedPickId}
+                  onToggle={(pickId) => setExpandedPickId((current) => current === pickId ? null : pickId)}
+                />
+              </div>
+            </>
+          )}
         </div>
       </section>
     </main>
+  );
+}
+
+function FinancialAnalytics({ analytics, summary }) {
+  return (
+    <div className="analyticsView">
+      <div className="analyticsCards">
+        <InsightCard label="Net P/L" value={formatCurrency(analytics.netProfitDollars)} detail={`${analytics.profitUnits.toFixed(2)} units at ${formatJuice(summary.assumed_juice || -115)}`} tone={analytics.netProfitDollars >= 0 ? "positive" : "negative"} />
+        <InsightCard label="Best Day" value={analytics.bestDay ? formatCurrency(analytics.bestDay.profitDollars) : "$0"} detail={analytics.bestDay ? `${formatDate(analytics.bestDay.date)} · ${analytics.bestDay.record}` : "No graded days yet"} tone="positive" />
+        <InsightCard label="Worst Day" value={analytics.worstDay ? formatCurrency(analytics.worstDay.profitDollars) : "$0"} detail={analytics.worstDay ? `${formatDate(analytics.worstDay.date)} · ${analytics.worstDay.record}` : "No graded days yet"} tone="negative" />
+        <InsightCard label="Best Player" value={analytics.topPlayers[0]?.name || "n/a"} detail={analytics.topPlayers[0] ? `${formatCurrency(analytics.topPlayers[0].profitDollars)} · ${analytics.topPlayers[0].record}` : "No graded players yet"} tone="positive" />
+      </div>
+
+      <div className="analyticsGrid">
+        <section className="analyticsPanel wide">
+          <div className="analyticsHeader">
+            <div>
+              <p className="sectionLabel">Daily P/L</p>
+              <h3>Profit by day</h3>
+            </div>
+            <span>{analytics.daily.length} days tracked</span>
+          </div>
+          <DailyProfitChart rows={analytics.daily} maxAbs={analytics.maxDailyAbs} />
+        </section>
+
+        <section className="analyticsPanel">
+          <div className="analyticsHeader">
+            <div>
+              <p className="sectionLabel">Cumulative</p>
+              <h3>Bankroll curve</h3>
+            </div>
+            <span>{formatCurrency(analytics.netProfitDollars)}</span>
+          </div>
+          <CumulativeChart rows={analytics.daily} maxAbs={analytics.maxCumulativeAbs} />
+        </section>
+      </div>
+
+      <div className="analyticsGrid">
+        <Leaderboard title="Most Profitable Players" rows={analytics.topPlayers} positive />
+        <Leaderboard title="Biggest Player Drawdowns" rows={analytics.bottomPlayers} />
+      </div>
+
+      <div className="analyticsGrid three">
+        <SliceTable title="By Stat" rows={analytics.byStat} />
+        <SliceTable title="By Source" rows={analytics.bySource} />
+        <SliceTable title="By Model" rows={analytics.byModel} />
+      </div>
+    </div>
+  );
+}
+
+function InsightCard({ label, value, detail, tone }) {
+  return (
+    <div className={`insightCard ${tone || ""}`}>
+      <p>{label}</p>
+      <strong>{value}</strong>
+      <span>{detail}</span>
+    </div>
+  );
+}
+
+function DailyProfitChart({ rows, maxAbs }) {
+  if (!rows.length) return <div className="emptyAnalytics">No graded days yet.</div>;
+  return (
+    <div className="dailyChart">
+      {rows.map((row) => {
+        const height = maxAbs ? Math.max(8, Math.abs(row.profitDollars) / maxAbs * 100) : 8;
+        return (
+          <div key={row.date} className="dailyBarWrap" title={`${formatDate(row.date)}: ${formatCurrency(row.profitDollars)} · ${row.record}`}>
+            <span>{formatCurrency(row.profitDollars)}</span>
+            <div className="barTrack">
+              <i className={row.profitDollars >= 0 ? "up" : "down"} style={{ height: `${height}%` }} />
+            </div>
+            <small>{shortDate(row.date)}</small>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function CumulativeChart({ rows, maxAbs }) {
+  if (!rows.length) return <div className="emptyAnalytics">No graded picks yet.</div>;
+  return (
+    <div className="cumulativeList">
+      {rows.map((row) => {
+        const width = maxAbs ? Math.max(4, Math.abs(row.cumulativeDollars) / maxAbs * 100) : 4;
+        return (
+          <div key={row.date} className="cumulativeRow">
+            <span>{shortDate(row.date)}</span>
+            <div><i className={row.cumulativeDollars >= 0 ? "up" : "down"} style={{ width: `${width}%` }} /></div>
+            <strong>{formatCurrency(row.cumulativeDollars)}</strong>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function Leaderboard({ title, rows, positive = false }) {
+  return (
+    <section className="analyticsPanel">
+      <div className="analyticsHeader">
+        <div>
+          <p className="sectionLabel">Players</p>
+          <h3>{title}</h3>
+        </div>
+      </div>
+      <div className="leaderboard">
+        {rows.length ? rows.slice(0, 8).map((row, index) => (
+          <div key={row.name} className="leaderRow">
+            <span className="rank">{index + 1}</span>
+            <div>
+              <strong>{row.name}</strong>
+              <span>{row.record} · {row.graded} graded · {row.hitRate}% hit</span>
+            </div>
+            <b className={row.profitDollars >= 0 ? "positiveText" : "negativeText"}>{formatCurrency(row.profitDollars)}</b>
+          </div>
+        )) : <div className="emptyAnalytics">No graded player rows.</div>}
+      </div>
+    </section>
+  );
+}
+
+function SliceTable({ title, rows }) {
+  return (
+    <section className="analyticsPanel">
+      <div className="analyticsHeader">
+        <div>
+          <p className="sectionLabel">Slices</p>
+          <h3>{title}</h3>
+        </div>
+      </div>
+      <div className="sliceTable">
+        {rows.length ? rows.map((row) => (
+          <div key={row.name} className="sliceRow">
+            <strong>{filterLabel(row.name)}</strong>
+            <span>{row.record} · {row.hitRate}%</span>
+            <b className={row.profitDollars >= 0 ? "positiveText" : "negativeText"}>{formatCurrency(row.profitDollars)}</b>
+          </div>
+        )) : <div className="emptyAnalytics">No graded rows.</div>}
+      </div>
+    </section>
   );
 }
 
@@ -474,6 +628,112 @@ function buildFilterOptions(picks) {
   };
 }
 
+function buildFinancialAnalytics(picks, summary = {}) {
+  const unitSize = Number(summary.unit_size_dollars || 10);
+  const winProfitUnits = payoutFromJuice(summary.assumed_juice || -115);
+  const graded = picks.filter((pick) => pick.outcome === "hit" || pick.outcome === "miss");
+  const dailyMap = new Map();
+  const playerMap = new Map();
+  const statMap = new Map();
+  const sourceMap = new Map();
+  const modelMap = new Map();
+
+  for (const pick of graded) {
+    const profitUnits = pickProfitUnits(pick, winProfitUnits);
+    const profitDollars = profitUnits * unitSize;
+    addAggregate(dailyMap, pick.game_date, pick, profitUnits, profitDollars);
+    addAggregate(playerMap, pick.player_name || "Unknown Player", pick, profitUnits, profitDollars);
+    addAggregate(statMap, pick.stat_type, pick, profitUnits, profitDollars);
+    addAggregate(sourceMap, sourceKey(pick), pick, profitUnits, profitDollars);
+    addAggregate(modelMap, modelKey(pick), pick, profitUnits, profitDollars);
+  }
+
+  let cumulativeUnits = 0;
+  const daily = [...dailyMap.values()]
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+    .map((row) => {
+      cumulativeUnits += row.profitUnits;
+      return {
+        ...finalizeAggregate(row),
+        cumulativeUnits: Number(cumulativeUnits.toFixed(2)),
+        cumulativeDollars: Number((cumulativeUnits * unitSize).toFixed(2))
+      };
+    });
+
+  const players = [...playerMap.values()].map(finalizeAggregate);
+  const byProfitDesc = (a, b) => b.profitDollars - a.profitDollars || b.graded - a.graded;
+  const byProfitAsc = (a, b) => a.profitDollars - b.profitDollars || b.graded - a.graded;
+  const topPlayers = [...players].sort(byProfitDesc);
+  const bottomPlayers = [...players].sort(byProfitAsc);
+  const byStat = [...statMap.values()].map(finalizeAggregate).sort(byProfitDesc);
+  const bySource = [...sourceMap.values()].map(finalizeAggregate).sort(byProfitDesc);
+  const byModel = [...modelMap.values()].map(finalizeAggregate).sort(byProfitDesc);
+  const netProfitUnits = graded.reduce((total, pick) => total + pickProfitUnits(pick, winProfitUnits), 0);
+
+  return {
+    gradedCount: graded.length,
+    profitUnits: Number(netProfitUnits.toFixed(2)),
+    netProfitDollars: Number((netProfitUnits * unitSize).toFixed(2)),
+    daily,
+    bestDay: daily.length ? [...daily].sort(byProfitDesc)[0] : null,
+    worstDay: daily.length ? [...daily].sort(byProfitAsc)[0] : null,
+    topPlayers,
+    bottomPlayers,
+    byStat,
+    bySource,
+    byModel,
+    maxDailyAbs: Math.max(1, ...daily.map((row) => Math.abs(row.profitDollars))),
+    maxCumulativeAbs: Math.max(1, ...daily.map((row) => Math.abs(row.cumulativeDollars)))
+  };
+}
+
+function addAggregate(map, key, pick, profitUnits, profitDollars) {
+  if (!map.has(key)) {
+    map.set(key, {
+      name: key,
+      date: key,
+      wins: 0,
+      losses: 0,
+      graded: 0,
+      profitUnits: 0,
+      profitDollars: 0
+    });
+  }
+  const row = map.get(key);
+  row.graded += 1;
+  row.wins += pick.outcome === "hit" ? 1 : 0;
+  row.losses += pick.outcome === "miss" ? 1 : 0;
+  row.profitUnits += profitUnits;
+  row.profitDollars += profitDollars;
+}
+
+function finalizeAggregate(row) {
+  const wins = row.wins || 0;
+  const losses = row.losses || 0;
+  const graded = row.graded || wins + losses;
+  return {
+    ...row,
+    wins,
+    losses,
+    graded,
+    profitUnits: Number(row.profitUnits.toFixed(2)),
+    profitDollars: Number(row.profitDollars.toFixed(2)),
+    hitRate: graded ? Number(((wins / graded) * 100).toFixed(1)) : 0,
+    record: `${wins}-${losses}`
+  };
+}
+
+function pickProfitUnits(pick, winProfitUnits) {
+  if (pick.outcome === "hit") return winProfitUnits;
+  if (pick.outcome === "miss") return -1;
+  return 0;
+}
+
+function payoutFromJuice(juice) {
+  const number = Math.abs(Number(juice || -115));
+  return number >= 100 ? 100 / number : number / 100;
+}
+
 function uniqueSorted(values) {
   return [...new Set(values.filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b)));
 }
@@ -530,6 +790,11 @@ function initials(name = "") {
 function formatDate(date) {
   const [year, month, day] = String(date).slice(0, 10).split("-").map(Number);
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(year, month - 1, day));
+}
+
+function shortDate(date) {
+  const [year, month, day] = String(date).slice(0, 10).split("-").map(Number);
+  return new Intl.DateTimeFormat("en-US", { month: "numeric", day: "numeric" }).format(new Date(year, month - 1, day));
 }
 
 function formatCurrency(value) {
