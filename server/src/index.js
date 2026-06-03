@@ -8,7 +8,7 @@ import { config } from "./config.js";
 import { migrate } from "./db.js";
 import { bootstrapAutomation, isoDate, reconcileRecentResults, reconcileResultsForDate, runDailyModel, runPregameModelRefresh } from "./jobs.js";
 import { dateOnly } from "./model.js";
-import { markResults, pickHistory, picksForDate, playerTrend } from "./repository.js";
+import { lineSnapshotsForPick, markResults, pickHistory, picksForDate, playerTrend, setTrackedBet } from "./repository.js";
 
 const app = express();
 
@@ -85,6 +85,39 @@ app.get("/players/:id/trend", async (req, res, next) => {
         game_date: dateOnly(game.game_date)
       }))
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/picks/:id/line-snapshots", async (req, res, next) => {
+  try {
+    const rows = await lineSnapshotsForPick(Number(req.params.id));
+    res.json({
+      pick_id: Number(req.params.id),
+      snapshots: rows.map((row) => ({
+        created_at: row.created_at,
+        observed_line: row.observed_line === null ? null : Number(row.observed_line),
+        estimated_line: row.estimated_line === null ? null : Number(row.estimated_line),
+        real_line: row.real_line === null ? null : Number(row.real_line),
+        line_gap: row.line_gap === null ? null : Number(row.line_gap),
+        line_source: row.line_source,
+        bookmaker: row.bookmaker,
+        odds_price: row.odds_price === null ? null : Number(row.odds_price),
+        confidence_score: row.confidence_score,
+        is_value_under: row.is_value_under
+      }))
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/picks/:id/tracked-bet", async (req, res, next) => {
+  try {
+    const pick = await setTrackedBet(Number(req.params.id), req.body?.tracked !== false, req.body?.stake);
+    if (!pick) return res.status(404).json({ error: "Pick not found" });
+    res.json({ pick: toPickDto(pick) });
   } catch (error) {
     next(error);
   }
@@ -184,6 +217,14 @@ function toPickDto(row) {
     line_source: row.line_source || "generated",
     bookmaker: row.bookmaker,
     odds_price: row.odds_price === null ? null : Number(row.odds_price),
+    estimated_line: row.estimated_line === null ? null : Number(row.estimated_line),
+    real_line: row.real_line === null ? null : Number(row.real_line),
+    line_gap: row.line_gap === null ? null : Number(row.line_gap),
+    line_match_quality: row.line_match_quality || "model_only",
+    line_alerts: Array.isArray(row.line_alerts) ? row.line_alerts : [],
+    tracked_bet: Boolean(row.tracked_bet),
+    tracked_stake: row.tracked_stake === null ? null : Number(row.tracked_stake),
+    tracked_at: row.tracked_at,
     is_value_under: row.is_value_under,
     result_value: row.result_value === null ? null : Number(row.result_value),
     outcome: row.outcome

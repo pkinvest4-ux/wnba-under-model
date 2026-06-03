@@ -166,9 +166,10 @@ export async function savePicks(playerId, gameId, gameDate, picks) {
           player_id, game_id, game_date, stat_type, line, confidence_score, fatigue_cycle_score,
           energy_band, opponent_def_rating, recent_minutes_avg, days_rest, back_to_back,
           under_hit_rate, rest_risk, load_risk, opponent_risk, b2b_risk, model_version,
-          reasons, factor_breakdown, formula_summary, line_source, bookmaker, odds_price, is_value_under
+          reasons, factor_breakdown, formula_summary, line_source, bookmaker, odds_price,
+          estimated_line, real_line, line_gap, line_match_quality, line_alerts, is_value_under
         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19::jsonb, $20::jsonb, $21, $22, $23, $24, $25)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19::jsonb, $20::jsonb, $21, $22, $23, $24, $25, $26, $27, $28, $29::jsonb, $30)
          ON CONFLICT (player_id, game_date, stat_type, line) DO UPDATE SET
            game_id = EXCLUDED.game_id,
            confidence_score = EXCLUDED.confidence_score,
@@ -190,6 +191,11 @@ export async function savePicks(playerId, gameId, gameDate, picks) {
            line_source = EXCLUDED.line_source,
            bookmaker = EXCLUDED.bookmaker,
            odds_price = EXCLUDED.odds_price,
+           estimated_line = EXCLUDED.estimated_line,
+           real_line = EXCLUDED.real_line,
+           line_gap = EXCLUDED.line_gap,
+           line_match_quality = EXCLUDED.line_match_quality,
+           line_alerts = EXCLUDED.line_alerts,
            is_value_under = EXCLUDED.is_value_under`,
         [
           playerId,
@@ -216,11 +222,63 @@ export async function savePicks(playerId, gameId, gameDate, picks) {
           pick.line_source || "generated",
           pick.bookmaker || null,
           pick.odds_price ?? null,
+          pick.estimated_line ?? null,
+          pick.real_line ?? null,
+          pick.line_gap ?? null,
+          pick.line_match_quality || "model_only",
+          JSON.stringify(pick.line_alerts || []),
+          pick.is_value_under
+        ]
+      );
+      await client.query(
+        `INSERT INTO line_snapshots (
+          player_id, game_id, game_date, stat_type, observed_line, estimated_line, real_line,
+          line_gap, line_source, bookmaker, odds_price, confidence_score, is_value_under
+        )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+        [
+          playerId,
+          gameId,
+          gameDate,
+          pick.stat_type,
+          pick.line,
+          pick.estimated_line ?? null,
+          pick.real_line ?? null,
+          pick.line_gap ?? null,
+          pick.line_source || "generated",
+          pick.bookmaker || null,
+          pick.odds_price ?? null,
+          pick.confidence_score,
           pick.is_value_under
         ]
       );
     }
   });
+}
+
+export async function setTrackedBet(pickId, tracked, stake = null) {
+  const { rows } = await query(`
+    UPDATE picks
+    SET tracked_bet = $2,
+      tracked_stake = CASE WHEN $2 THEN COALESCE($3::numeric, tracked_stake, 10) ELSE NULL END,
+      tracked_at = CASE WHEN $2 THEN now() ELSE NULL END
+    WHERE id = $1
+    RETURNING *
+  `, [pickId, Boolean(tracked), stake]);
+  return rows[0];
+}
+
+export async function lineSnapshotsForPick(pickId) {
+  const { rows: pickRows } = await query("SELECT player_id, game_date, stat_type FROM picks WHERE id = $1", [pickId]);
+  const pick = pickRows[0];
+  if (!pick) return [];
+  const { rows } = await query(`
+    SELECT *
+    FROM line_snapshots
+    WHERE player_id = $1 AND game_date = $2 AND stat_type = $3
+    ORDER BY created_at ASC
+  `, [pick.player_id, pick.game_date, pick.stat_type]);
+  return rows;
 }
 
 export async function getModelWeights() {

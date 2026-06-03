@@ -103,6 +103,14 @@ export async function migrate() {
       line_source TEXT DEFAULT 'generated',
       bookmaker TEXT,
       odds_price NUMERIC,
+      estimated_line NUMERIC,
+      real_line NUMERIC,
+      line_gap NUMERIC,
+      line_match_quality TEXT DEFAULT 'model_only',
+      line_alerts JSONB DEFAULT '[]'::jsonb,
+      tracked_bet BOOLEAN DEFAULT false,
+      tracked_stake NUMERIC,
+      tracked_at TIMESTAMPTZ,
       is_value_under BOOLEAN DEFAULT false,
       result_value NUMERIC,
       outcome TEXT CHECK (outcome IN ('hit', 'miss', 'push', 'void')),
@@ -112,6 +120,26 @@ export async function migrate() {
 
     CREATE INDEX IF NOT EXISTS idx_picks_game_date ON picks(game_date);
     CREATE INDEX IF NOT EXISTS idx_logs_player_date ON player_game_logs(player_id, game_date DESC);
+
+    CREATE TABLE IF NOT EXISTS line_snapshots (
+      id SERIAL PRIMARY KEY,
+      player_id INTEGER NOT NULL REFERENCES players(id),
+      game_id INTEGER REFERENCES games(id),
+      game_date DATE NOT NULL,
+      stat_type TEXT NOT NULL CHECK (stat_type IN ('points', 'rebounds', 'assists', 'pra')),
+      observed_line NUMERIC NOT NULL,
+      estimated_line NUMERIC,
+      real_line NUMERIC,
+      line_gap NUMERIC,
+      line_source TEXT DEFAULT 'generated',
+      bookmaker TEXT,
+      odds_price NUMERIC,
+      confidence_score INTEGER,
+      is_value_under BOOLEAN DEFAULT false,
+      created_at TIMESTAMPTZ DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_line_snapshots_pick ON line_snapshots(player_id, game_date, stat_type, created_at DESC);
 
     CREATE TABLE IF NOT EXISTS model_weights (
       stat_type TEXT PRIMARY KEY CHECK (stat_type IN ('points', 'rebounds', 'assists', 'pra')),
@@ -130,6 +158,14 @@ export async function migrate() {
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS line_source TEXT DEFAULT 'generated';
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS bookmaker TEXT;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS odds_price NUMERIC;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS estimated_line NUMERIC;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS real_line NUMERIC;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS line_gap NUMERIC;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS line_match_quality TEXT DEFAULT 'model_only';
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS line_alerts JSONB DEFAULT '[]'::jsonb;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS tracked_bet BOOLEAN DEFAULT false;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS tracked_stake NUMERIC;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS tracked_at TIMESTAMPTZ;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS rest_risk NUMERIC;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS load_risk NUMERIC;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS opponent_risk NUMERIC;

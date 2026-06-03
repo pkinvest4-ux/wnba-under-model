@@ -393,7 +393,8 @@ h3 {
 }
 
 .ghostButton,
-.detailsButton {
+.detailsButton,
+.trackButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -416,8 +417,20 @@ h3 {
   height: 32px;
 }
 
+.trackButton {
+  min-height: 30px;
+  padding: 0 9px;
+}
+
+.trackButton.active {
+  border-color: #a8d1bd;
+  background: #eef8f3;
+  color: #1f6848;
+}
+
 .ghostButton:hover,
-.detailsButton:hover {
+.detailsButton:hover,
+.trackButton:hover {
   border-color: #9aa9bb;
   background: #f4f7fa;
 }

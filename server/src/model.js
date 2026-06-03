@@ -118,7 +118,11 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
 
   return STAT_KEYS.map((statType) => {
     const lineOverride = lineOverrides[statType];
-    const line = lineOverride?.line ?? buildLine(sortedLogs, statType);
+    const estimatedLine = buildLine(sortedLogs, statType);
+    const realLine = lineOverride?.line == null ? null : Number(lineOverride.line);
+    const line = realLine ?? estimatedLine;
+    const lineGap = realLine == null ? null : Number((realLine - estimatedLine).toFixed(2));
+    const lineMatchQuality = lineQuality(lineGap, realLine);
     const under_hit_rate = underHitRate(sortedLogs, statType, line);
     const baseFeatures = {
       fatigue_cycle_score,
@@ -129,7 +133,7 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
       under_hit_rate
     };
     const risks = normalizedRisks(baseFeatures);
-    const allFeatures = { ...baseFeatures, ...risks, line_source: lineOverride?.source || "generated" };
+    const allFeatures = { ...baseFeatures, ...risks, line_source: lineOverride?.source || "generated", line_match_quality: lineMatchQuality };
     const { confidence_score, model_version } = scoreUnderWithWeights(allFeatures, weightsByStat, statType);
     const factor_breakdown = factorBreakdown(allFeatures, weightsByStat?.[statType]);
     const reasons = pickReasons(allFeatures, factor_breakdown);
@@ -137,6 +141,11 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
     return {
       stat_type: statType,
       line,
+      estimated_line: estimatedLine,
+      real_line: realLine,
+      line_gap: lineGap,
+      line_match_quality: lineMatchQuality,
+      line_alerts: lineAlerts({ realLine, lineGap, lineMatchQuality }),
       confidence_score,
       fatigue_cycle_score,
       energy_band: energyBand(fatigue_cycle_score),
@@ -156,6 +165,23 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
       odds_price: lineOverride?.price ?? null
     };
   });
+}
+
+function lineQuality(lineGap, realLine) {
+  if (realLine == null) return "model_only";
+  const absGap = Math.abs(Number(lineGap || 0));
+  if (absGap <= 0.5) return "near_market";
+  if (absGap <= 1) return "close_market";
+  return "wide_gap";
+}
+
+function lineAlerts({ realLine, lineGap, lineMatchQuality }) {
+  if (realLine == null) return ["Model-estimated line"];
+  const alerts = ["Real prop line"];
+  if (lineMatchQuality === "near_market") alerts.push("Near model line");
+  if (lineMatchQuality === "close_market") alerts.push("Close to model line");
+  if (lineMatchQuality === "wide_gap") alerts.push(`Market gap ${lineGap > 0 ? "+" : ""}${lineGap}`);
+  return alerts;
 }
 
 export function pickReasons(features, breakdown = []) {

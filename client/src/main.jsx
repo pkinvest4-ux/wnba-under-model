@@ -23,6 +23,7 @@ const EMPTY_FILTERS = {
   stat: "all",
   source: "all",
   model: "all",
+  lineQuality: "all",
   team: "all",
   starter: "all",
   energy: "all",
@@ -55,6 +56,22 @@ function App() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function toggleTrackedBet(pick) {
+    const nextTracked = !pick.tracked_bet;
+    const res = await fetch(`${API}/picks/${pick.id}/tracked-bet`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tracked: nextTracked, stake: summary.unit_size_dollars || 10 })
+    });
+    if (!res.ok) throw new Error("Unable to update tracked bet");
+    updatePickState(pick.id, { tracked_bet: nextTracked, tracked_stake: nextTracked ? summary.unit_size_dollars || 10 : null });
+  }
+
+  function updatePickState(pickId, patch) {
+    setToday((current) => ({ ...current, picks: (current.picks || []).map((pick) => pick.id === pickId ? { ...pick, ...patch } : pick) }));
+    setHistory((current) => ({ ...current, picks: (current.picks || []).map((pick) => pick.id === pickId ? { ...pick, ...patch } : pick) }));
   }
 
   useEffect(() => {
@@ -174,6 +191,7 @@ function App() {
                   )}
                   <SelectFilter label="Stat" value={filters.stat} options={filterOptions.stats} onChange={(value) => setFilter("stat", value)} />
                   <SelectFilter label="Source" value={filters.source} options={filterOptions.sources} onChange={(value) => setFilter("source", value)} />
+                  <SelectFilter label="Line Fit" value={filters.lineQuality} options={filterOptions.lineQualities} onChange={(value) => setFilter("lineQuality", value)} />
                   <SelectFilter label="Model" value={filters.model} options={filterOptions.models} onChange={(value) => setFilter("model", value)} />
                   <SelectFilter label="Team" value={filters.team} options={filterOptions.teams} onChange={(value) => setFilter("team", value)} />
                   <SelectFilter label="Starter" value={filters.starter} options={["all", "starter", "bench"]} onChange={(value) => setFilter("starter", value)} />
@@ -193,6 +211,7 @@ function App() {
                   activeView={activeView}
                   expandedPickId={expandedPickId}
                   onToggle={(pickId) => setExpandedPickId((current) => current === pickId ? null : pickId)}
+                  onTrack={toggleTrackedBet}
                 />
               </div>
             </>
@@ -211,6 +230,7 @@ function FinancialAnalytics({ analytics, summary }) {
         <InsightCard label="Best Day" value={analytics.bestDay ? formatCurrency(analytics.bestDay.profitDollars) : "$0"} detail={analytics.bestDay ? `${formatDate(analytics.bestDay.date)} · ${analytics.bestDay.record}` : "No graded days yet"} tone="positive" />
         <InsightCard label="Worst Day" value={analytics.worstDay ? formatCurrency(analytics.worstDay.profitDollars) : "$0"} detail={analytics.worstDay ? `${formatDate(analytics.worstDay.date)} · ${analytics.worstDay.record}` : "No graded days yet"} tone="negative" />
         <InsightCard label="Best Player" value={analytics.topPlayers[0]?.name || "n/a"} detail={analytics.topPlayers[0] ? `${formatCurrency(analytics.topPlayers[0].profitDollars)} · ${analytics.topPlayers[0].record}` : "No graded players yet"} tone="positive" />
+        <InsightCard label="Tracked Bets" value={formatCurrency(analytics.tracked.profitDollars)} detail={`${analytics.tracked.record} · ${analytics.tracked.graded} graded`} tone={analytics.tracked.profitDollars >= 0 ? "positive" : "negative"} />
       </div>
 
       <div className="analyticsGrid">
@@ -346,9 +366,9 @@ function SliceTable({ title, rows }) {
   );
 }
 
-function PickBoard({ picks, loading, activeView, expandedPickId, onToggle }) {
+function PickBoard({ picks, loading, activeView, expandedPickId, onToggle, onTrack }) {
   const showResult = activeView === "history";
-  const colSpan = showResult ? 9 : 8;
+  const colSpan = showResult ? 10 : 9;
 
   return (
     <table>
@@ -363,6 +383,7 @@ function PickBoard({ picks, loading, activeView, expandedPickId, onToggle }) {
           <th>Why</th>
           <th>Confidence</th>
           <th>Energy Index</th>
+          <th>Track</th>
           <th>Details</th>
         </tr>
       </thead>
@@ -386,6 +407,11 @@ function PickBoard({ picks, loading, activeView, expandedPickId, onToggle }) {
                 <td><ReasonChips reasons={pick.reasons} formula={pick.formula_summary} breakdown={pick.factor_breakdown} /></td>
                 <td><Confidence value={pick.confidence_score} /></td>
                 <td><Energy value={pick.energy_index} /></td>
+                <td>
+                  <button className={`trackButton ${pick.tracked_bet ? "active" : ""}`} onClick={() => onTrack(pick)} title={pick.tracked_bet ? "Tracked as bet" : "Mark as bet"}>
+                    {pick.tracked_bet ? "Tracked" : "Track"}
+                  </button>
+                </td>
                 <td>
                   <button className="detailsButton" onClick={() => onToggle(pick.id)} aria-label={`${expanded ? "Hide" : "Show"} pick details`}>
                     {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -425,20 +451,24 @@ function PickDetails({ pick }) {
 
       <div className="detailGrid">
         <DetailStat label="Line Source" value={lineSourceLabel(pick)} />
+        <DetailStat label="Line Fit" value={filterLabel(pick.line_match_quality || "model_only")} />
+        <DetailStat label="Model Est." value={pick.estimated_line ?? "n/a"} />
+        <DetailStat label="Real Line" value={pick.real_line ?? "n/a"} />
+        <DetailStat label="Line Gap" value={pick.line_gap ?? "n/a"} />
         <DetailStat label="Odds Price" value={pick.odds_price ?? "n/a"} />
         <DetailStat label="Under Hit Rate" value={formatPercent(pick.under_hit_rate)} />
         <DetailStat label="Recent Minutes" value={formatNumber(pick.recent_minutes_avg)} />
         <DetailStat label="Days Rest" value={pick.days_rest ?? "n/a"} />
         <DetailStat label="Back-to-Back" value={pick.back_to_back ? "Yes" : "No"} />
         <DetailStat label="Opponent Rating" value={formatNumber(pick.opponent_def_rating)} />
-        <DetailStat label="Energy Index" value={pick.energy_index || "n/a"} />
+        <DetailStat label="Tracked Bet" value={pick.tracked_bet ? "Yes" : "No"} />
       </div>
 
       <div className="detailColumns">
         <div>
           <p className="detailTitle">Reasons</p>
           <div className="reasonChips expanded">
-            {(pick.reasons?.length ? pick.reasons : ["Model signal"]).map((reason) => <span key={reason}>{reason}</span>)}
+            {[...(pick.line_alerts || []), ...(pick.reasons?.length ? pick.reasons : ["Model signal"])].map((reason) => <span key={reason}>{reason}</span>)}
           </div>
         </div>
         <div>
@@ -598,6 +628,7 @@ function applyFilters(picks, filters, searchTerm, activeView) {
     if (activeView === "history" && filters.outcome !== "all" && outcome !== filters.outcome) return false;
     if (filters.stat !== "all" && pick.stat_type !== filters.stat) return false;
     if (filters.source !== "all" && sourceKey(pick) !== filters.source) return false;
+    if (filters.lineQuality !== "all" && (pick.line_match_quality || "model_only") !== filters.lineQuality) return false;
     if (filters.model !== "all" && modelKey(pick) !== filters.model) return false;
     if (filters.team !== "all" && pick.team !== filters.team) return false;
     if (filters.starter === "starter" && !pick.starter) return false;
@@ -623,6 +654,7 @@ function buildFilterOptions(picks) {
   return {
     stats: ["all", ...uniqueSorted(picks.map((pick) => pick.stat_type))],
     sources: ["all", ...uniqueSorted(picks.map(sourceKey))],
+    lineQualities: ["all", ...uniqueSorted(picks.map((pick) => pick.line_match_quality || "model_only"))],
     models: ["all", ...uniqueSorted(picks.map(modelKey))],
     teams: ["all", ...uniqueSorted(picks.map((pick) => pick.team).filter(Boolean))],
     energy: ["all", ...["low", "medium", "high"].filter((band) => picks.some((pick) => pick.energy_index === band))]
@@ -670,6 +702,15 @@ function buildFinancialAnalytics(picks, summary = {}) {
   const bySource = [...sourceMap.values()].map(finalizeAggregate).sort(byProfitDesc);
   const byModel = [...modelMap.values()].map(finalizeAggregate).sort(byProfitDesc);
   const netProfitUnits = graded.reduce((total, pick) => total + pickProfitUnits(pick, winProfitUnits), 0);
+  const tracked = finalizeAggregate(graded.filter((pick) => pick.tracked_bet).reduce((row, pick) => {
+    const units = pickProfitUnits(pick, winProfitUnits);
+    row.wins += pick.outcome === "hit" ? 1 : 0;
+    row.losses += pick.outcome === "miss" ? 1 : 0;
+    row.graded += 1;
+    row.profitUnits += units;
+    row.profitDollars += units * Number(pick.tracked_stake || unitSize);
+    return row;
+  }, { name: "tracked", wins: 0, losses: 0, graded: 0, profitUnits: 0, profitDollars: 0 }));
 
   return {
     gradedCount: graded.length,
@@ -683,6 +724,7 @@ function buildFinancialAnalytics(picks, summary = {}) {
     byStat,
     bySource,
     byModel,
+    tracked,
     maxDailyAbs: Math.max(1, ...daily.map((row) => Math.abs(row.profitDollars))),
     maxCumulativeAbs: Math.max(1, ...daily.map((row) => Math.abs(row.cumulativeDollars)))
   };
