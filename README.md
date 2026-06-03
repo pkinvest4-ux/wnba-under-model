@@ -36,6 +36,8 @@ CRON_ENABLED=true
 AUTO_BOOTSTRAP=true
 UNIT_SIZE_DOLLARS=10
 ASSUMED_JUICE=-115
+MODEL_LEARNING_ENABLED=false
+MODEL_LEARNING_MIN_SAMPLES=1000
 PORT=3000
 ```
 
@@ -157,7 +159,7 @@ Then load historical logs into `player_game_logs` or let the app build picks fro
 The service runs on its own:
 
 - Startup automation refreshes rosters/logs, grades recent results, and generates current-day picks.
-- Startup automation also trains learned scoring weights when enough settled outcomes exist.
+- Startup automation keeps feature/outcome data ready for later analysis.
 - Model refreshes run at 10am, noon, 3pm, 5pm, 7pm, and 9pm ET to catch later prop-line availability.
 - A 1:30am ET cron job grades recent completed picks.
 - A 2pm ET cron job runs a second short result sync for late stat updates.
@@ -172,7 +174,7 @@ npm run run:train
 
 ## Learning Loop
 
-Every pick stores its feature snapshot and final outcome. After result sync, the app trains per-stat logistic weights for points, rebounds, assists, and PRA once a stat has enough settled examples. Future pick scores use those learned weights and are marked `Learned` in the dashboard; until enough history exists, they use the fixed baseline model and are marked `Fixed`.
+Every pick stores its feature snapshot and final outcome. Adaptive scoring is disabled by default because early samples are noisy. With `MODEL_LEARNING_ENABLED=false`, future pick scores use the fixed baseline model and are marked `Fixed`; the settled data is still stored so the learned model can be evaluated later. To enable adaptive scoring intentionally, set `MODEL_LEARNING_ENABLED=true` and keep `MODEL_LEARNING_MIN_SAMPLES` high enough for the sample size you trust.
 
 Each pick also stores short reason chips and a formula breakdown. Reason chips include percentage shares of the weighted signal contribution, while the tooltip exposes the formula summary and factor shares without exposing internal cycle math.
 

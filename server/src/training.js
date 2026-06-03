@@ -1,4 +1,5 @@
 import { getSettledTrainingPicks, saveModelWeights } from "./repository.js";
+import { config } from "./config.js";
 
 const FEATURES = [
   "fatigue_cycle_score",
@@ -9,19 +10,22 @@ const FEATURES = [
   "under_hit_rate"
 ];
 
-const MIN_SAMPLES = 40;
 const LEARNING_RATE = 0.08;
 const L2 = 0.015;
 const EPOCHS = 500;
 
 export async function trainModelWeights() {
+  if (!config.modelLearningEnabled) {
+    return [{ trained: false, reason: "model learning disabled" }];
+  }
+
   const picks = await getSettledTrainingPicks();
   const byStat = groupBy(picks, (pick) => pick.stat_type);
   const results = [];
 
   for (const [statType, rows] of byStat.entries()) {
-    if (rows.length < MIN_SAMPLES) {
-      results.push({ stat_type: statType, sample_size: rows.length, trained: false });
+    if (rows.length < config.modelLearningMinSamples) {
+      results.push({ stat_type: statType, sample_size: rows.length, min_samples: config.modelLearningMinSamples, trained: false });
       continue;
     }
 

@@ -164,7 +164,7 @@ export async function runDailyModel(date = isoDate()) {
 
   const players = await getActivePlayers();
   const lineMap = await fetchPropLinesForGames(games);
-  const weightsByStat = await getModelWeights();
+  const weightsByStat = config.modelLearningEnabled ? await getModelWeights() : {};
   await deletePicksForDate(date);
   let picksCount = 0;
   let valueCount = 0;
