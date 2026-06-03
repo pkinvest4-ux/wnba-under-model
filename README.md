@@ -38,6 +38,7 @@ UNIT_SIZE_DOLLARS=10
 ASSUMED_JUICE=-115
 MODEL_LEARNING_ENABLED=false
 MODEL_LEARNING_MIN_SAMPLES=1000
+PREGAME_REFRESH_WINDOW_MINUTES=75
 PORT=3000
 ```
 
@@ -161,6 +162,7 @@ The service runs on its own:
 - Startup automation refreshes rosters/logs, grades recent results, and generates current-day picks.
 - Startup automation keeps feature/outcome data ready for later analysis.
 - Model refreshes run at 10am, noon, 3pm, 5pm, 7pm, and 9pm ET to catch later prop-line availability.
+- Pregame checks run every 15 minutes from 10am-11pm ET and refresh the card once when a game is within `PREGAME_REFRESH_WINDOW_MINUTES` of tip.
 - A 1:30am ET cron job grades recent completed picks.
 - A 2pm ET cron job runs a second short result sync for late stat updates.
 

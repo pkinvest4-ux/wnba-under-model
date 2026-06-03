@@ -63,6 +63,7 @@ export async function fetchEspnGamesByDate(date, season) {
     return {
       external_id: String(event.id),
       date,
+      start_time: event.date || event.competitions?.[0]?.date || null,
       season: event.season?.year || season,
       status: event.status?.type?.name || "scheduled",
       home_team_external_id: home?.team?.id ? String(home.team.id) : null,
@@ -108,6 +109,7 @@ export async function fetchEspnPlayerStatsByDate(date, season) {
           game: {
             id: game.external_id,
             date: game.date,
+            start_time: game.start_time,
             season,
             status: summary.header?.competitions?.[0]?.status?.type?.name || game.status,
             home_team: homeTeam,

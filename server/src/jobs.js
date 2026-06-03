@@ -23,6 +23,8 @@ import {
 import { buildPickFeatures, dateOnly } from "./model.js";
 import { buildMockLogs } from "./mockData.js";
 
+const pregameRefreshes = new Set();
+
 export function isoDate(date = new Date()) {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/New_York",
@@ -181,6 +183,53 @@ export async function runDailyModel(date = isoDate()) {
   }
 
   return { date, games: games.length, picks: picksCount, value_unders: valueCount };
+}
+
+export async function runPregameModelRefresh(now = new Date()) {
+  const date = isoDate(now);
+  await syncGames(date);
+  const games = await getTodayGames(date);
+  const upcoming = games.filter((game) => {
+    if (!game.start_time) return false;
+    const minutesUntilTip = (new Date(game.start_time).getTime() - now.getTime()) / 60000;
+    return minutesUntilTip > 0 && minutesUntilTip <= config.pregameRefreshWindowMinutes;
+  });
+
+  const dueGames = upcoming.filter((game) => {
+    const key = `${date}:${game.external_id}`;
+    return !pregameRefreshes.has(key);
+  });
+
+  if (!dueGames.length) {
+    return {
+      date,
+      checked_games: games.length,
+      due_games: 0,
+      refreshed: false
+    };
+  }
+
+  for (const game of dueGames) {
+    pregameRefreshes.add(`${date}:${game.external_id}`);
+  }
+
+  const refresh = await runDailyModel(date);
+  return {
+    date,
+    checked_games: games.length,
+    due_games: dueGames.length,
+    refreshed: true,
+    games: dueGames.map((game) => ({
+      id: game.external_id,
+      start_time: game.start_time,
+      matchup: `${game.away_abbreviation || game.away_team} @ ${game.home_abbreviation || game.home_team}`
+    })),
+    refresh
+  };
+}
+
+export function clearPregameRefreshMemory() {
+  pregameRefreshes.clear();
 }
 
 export async function reconcileResultsForDate(date = addDays(isoDate(), -1)) {

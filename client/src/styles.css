@@ -869,6 +869,17 @@ tbody tr.detailRow td {
   line-height: 1.5;
 }
 
+.marketWarning {
+  margin: 9px 0 0;
+  padding: 9px 10px;
+  border: 1px solid #dbc68f;
+  border-radius: 8px;
+  background: #fff8e6;
+  color: #7a5b0b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .breakdownGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

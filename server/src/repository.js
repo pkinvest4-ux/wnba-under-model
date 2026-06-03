@@ -58,17 +58,18 @@ export async function upsertGame(game) {
   const { rows: homeRows } = await query("SELECT id FROM teams WHERE external_id = $1", [game.home_team_external_id]);
   const { rows: awayRows } = await query("SELECT id FROM teams WHERE external_id = $1", [game.away_team_external_id]);
   const { rows } = await query(
-    `INSERT INTO games (external_id, game_date, home_team_id, away_team_id, season, status, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, now())
+    `INSERT INTO games (external_id, game_date, home_team_id, away_team_id, season, status, start_time, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, now())
      ON CONFLICT (external_id) DO UPDATE SET
        game_date = EXCLUDED.game_date,
        home_team_id = EXCLUDED.home_team_id,
        away_team_id = EXCLUDED.away_team_id,
        season = EXCLUDED.season,
        status = EXCLUDED.status,
+       start_time = COALESCE(EXCLUDED.start_time, games.start_time),
        updated_at = now()
      RETURNING *`,
-    [game.external_id, game.date, homeRows[0]?.id || null, awayRows[0]?.id || null, game.season, game.status]
+    [game.external_id, game.date, homeRows[0]?.id || null, awayRows[0]?.id || null, game.season, game.status, game.start_time || null]
   );
   return rows[0];
 }

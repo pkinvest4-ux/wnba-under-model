@@ -56,6 +56,7 @@ export async function migrate() {
       away_team_id INTEGER REFERENCES teams(id),
       season INTEGER,
       status TEXT DEFAULT 'scheduled',
+      start_time TIMESTAMPTZ,
       updated_at TIMESTAMPTZ DEFAULT now()
     );
 
@@ -137,6 +138,7 @@ export async function migrate() {
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS reasons JSONB DEFAULT '[]'::jsonb;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS factor_breakdown JSONB DEFAULT '[]'::jsonb;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS formula_summary TEXT;
+    ALTER TABLE games ADD COLUMN IF NOT EXISTS start_time TIMESTAMPTZ;
     ALTER TABLE players ADD COLUMN IF NOT EXISTS roster_status TEXT DEFAULT 'roster';
     ALTER TABLE players ADD COLUMN IF NOT EXISTS last_known_starter BOOLEAN DEFAULT false;
   `);

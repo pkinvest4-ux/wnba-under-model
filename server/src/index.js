@@ -6,7 +6,7 @@ import cron from "node-cron";
 import { z } from "zod";
 import { config } from "./config.js";
 import { migrate } from "./db.js";
-import { bootstrapAutomation, isoDate, reconcileRecentResults, reconcileResultsForDate, runDailyModel } from "./jobs.js";
+import { bootstrapAutomation, isoDate, reconcileRecentResults, reconcileResultsForDate, runDailyModel, runPregameModelRefresh } from "./jobs.js";
 import { dateOnly } from "./model.js";
 import { markResults, pickHistory, picksForDate, playerTrend } from "./repository.js";
 
@@ -119,6 +119,15 @@ app.post("/admin/run-daily", async (req, res, next) => {
   }
 });
 
+app.post("/admin/run-pregame-refresh", async (_req, res, next) => {
+  try {
+    const result = await runPregameModelRefresh();
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/admin/reconcile-results", async (req, res, next) => {
   try {
     const date = req.body?.date || isoDate();
@@ -190,6 +199,15 @@ if (config.cronEnabled) {
       console.log("scheduled model refresh", result);
     } catch (error) {
       console.error("scheduled model refresh failed", error);
+    }
+  }, { timezone: "America/New_York" });
+
+  cron.schedule("*/15 10-23 * * *", async () => {
+    try {
+      const result = await runPregameModelRefresh();
+      if (result.refreshed) console.log("pregame prop-line refresh", result);
+    } catch (error) {
+      console.error("pregame prop-line refresh failed", error);
     }
   }, { timezone: "America/New_York" });
 

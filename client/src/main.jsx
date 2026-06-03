@@ -108,7 +108,7 @@ function App() {
         <div>
           <p className="sectionLabel">Current Card</p>
           <h2>{todayPicks.length} value unders</h2>
-          <span>{highConfidenceCount} at 80+ confidence · {realLineCount} real-line matches</span>
+          <span>{highConfidenceCount} at 80+ confidence · {realLineCount} real prop lines · {todayPicks.length - realLineCount} model-estimated lines</span>
         </div>
         {topPick ? (
           <div className="spotlight">
@@ -444,6 +444,7 @@ function PickDetails({ pick }) {
         <div>
           <p className="detailTitle">Formula</p>
           <p className="formulaText">{pick.formula_summary || "confidence = model score from weighted player, rest, load, matchup, and historical signals"}</p>
+          {!isRealLine(pick) && <p className="marketWarning">Model-estimated line. Confirm the sportsbook line before treating this as bettable.</p>}
         </div>
       </div>
 
@@ -555,7 +556,7 @@ function SourceBadge({ pick }) {
   const real = isRealLine(pick);
   return (
     <span className={`sourceBadge ${real ? "real" : "fallback"}`} title={real ? pick.bookmaker || "Real line" : "Generated model line"}>
-      {real ? pick.bookmaker || "Real" : "Model"}
+      {real ? "Real Line" : "Model Est."}
     </span>
   );
 }
@@ -769,7 +770,7 @@ function modelKey(pick) {
 }
 
 function lineSourceLabel(pick) {
-  if (!isRealLine(pick)) return "Model fallback";
+  if (!isRealLine(pick)) return "Model estimate, not confirmed market line";
   return pick.bookmaker ? `${pick.bookmaker} real line` : "Real line";
 }
 
