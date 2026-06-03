@@ -14,6 +14,7 @@ import {
   getTodayGames,
   insertGameLog,
   markResults,
+  picksForDate,
   savePicks,
   upsertGame,
   upsertPlayer,
@@ -24,6 +25,7 @@ import { buildPickFeatures, dateOnly } from "./model.js";
 import { buildMockLogs } from "./mockData.js";
 
 const pregameRefreshes = new Set();
+const PREGAME_REFRESH_BUCKETS = [20, 45, 75];
 
 export function isoDate(date = new Date()) {
   const formatter = new Intl.DateTimeFormat("en-CA", {
@@ -189,14 +191,15 @@ export async function runPregameModelRefresh(now = new Date()) {
   const date = isoDate(now);
   await syncGames(date);
   const games = await getTodayGames(date);
-  const upcoming = games.filter((game) => {
+  const upcoming = games.map((game) => {
     if (!game.start_time) return false;
     const minutesUntilTip = (new Date(game.start_time).getTime() - now.getTime()) / 60000;
-    return minutesUntilTip > 0 && minutesUntilTip <= config.pregameRefreshWindowMinutes;
-  });
+    const bucket = PREGAME_REFRESH_BUCKETS.find((windowMinutes) => minutesUntilTip > 0 && minutesUntilTip <= Math.min(windowMinutes, config.pregameRefreshWindowMinutes));
+    return bucket ? { ...game, minutes_until_tip: Number(minutesUntilTip.toFixed(1)), refresh_bucket: bucket } : null;
+  }).filter(Boolean);
 
   const dueGames = upcoming.filter((game) => {
-    const key = `${date}:${game.external_id}`;
+    const key = `${date}:${game.external_id}:${game.refresh_bucket}`;
     return !pregameRefreshes.has(key);
   });
 
@@ -210,18 +213,25 @@ export async function runPregameModelRefresh(now = new Date()) {
   }
 
   for (const game of dueGames) {
-    pregameRefreshes.add(`${date}:${game.external_id}`);
+    pregameRefreshes.add(`${date}:${game.external_id}:${game.refresh_bucket}`);
   }
 
+  const before = await picksForDate(date, true);
   const refresh = await runDailyModel(date);
+  const after = await picksForDate(date, true);
   return {
     date,
     checked_games: games.length,
     due_games: dueGames.length,
     refreshed: true,
+    previous_value_unders: before.length,
+    current_value_unders: after.length,
+    value_under_delta: after.length - before.length,
     games: dueGames.map((game) => ({
       id: game.external_id,
       start_time: game.start_time,
+      minutes_until_tip: game.minutes_until_tip,
+      refresh_bucket: game.refresh_bucket,
       matchup: `${game.away_abbreviation || game.away_team} @ ${game.home_abbreviation || game.home_team}`
     })),
     refresh
