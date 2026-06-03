@@ -373,3 +373,22 @@ export async function markResults(results) {
   }
   return updated;
 }
+
+export async function voidMissingResults(gameDate, gameExternalIds, playerIdsWithStats) {
+  if (!gameExternalIds.length || !playerIdsWithStats.length) return [];
+
+  const { rows } = await query(`
+    UPDATE picks
+    SET outcome = 'void',
+      result_value = NULL
+    FROM games
+    WHERE picks.game_id = games.id
+      AND picks.game_date = $1
+      AND picks.outcome IS NULL
+      AND games.external_id = ANY($2::text[])
+      AND picks.player_id <> ALL($3::int[])
+    RETURNING picks.*
+  `, [gameDate, gameExternalIds, playerIdsWithStats]);
+
+  return rows;
+}

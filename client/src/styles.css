@@ -355,6 +355,12 @@ td span {
   color: #7a5b0b;
 }
 
+.outcomeBadge.void {
+  border-color: #cdd5df;
+  background: #eef2f6;
+  color: #4b5565;
+}
+
 .reasonChips {
   display: flex;
   flex-wrap: wrap;

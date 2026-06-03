@@ -314,7 +314,7 @@ function formatCurrency(value) {
 }
 
 function historySubtitle(summary = {}) {
-  return `${summary.settled || 0} settled · ${summary.wins || 0}-${summary.losses || 0}-${summary.pushes || 0} · ${formatCurrency(summary.estimated_profit_dollars || 0)}`;
+  return `${summary.settled || 0} resolved · ${summary.wins || 0}-${summary.losses || 0}-${summary.pushes || 0} · ${summary.voids || 0} void · ${formatCurrency(summary.estimated_profit_dollars || 0)}`;
 }
 
 createRoot(document.getElementById("root")).render(<App />);

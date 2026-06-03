@@ -17,7 +17,8 @@ import {
   savePicks,
   upsertGame,
   upsertPlayer,
-  upsertTeam
+  upsertTeam,
+  voidMissingResults
 } from "./repository.js";
 import { buildPickFeatures, dateOnly } from "./model.js";
 import { buildMockLogs } from "./mockData.js";
@@ -187,6 +188,8 @@ export async function reconcileResultsForDate(date = addDays(isoDate(), -1)) {
     ? await fetchPlayerStats({ dates: [date] })
     : await fetchEspnPlayerStatsByDate(date, config.season);
   const results = [];
+  const playerIdsWithStats = new Set();
+  const gameExternalIdsWithStats = new Set();
 
   for (const row of stats) {
     if (!row.player || !row.game) continue;
@@ -196,6 +199,8 @@ export async function reconcileResultsForDate(date = addDays(isoDate(), -1)) {
     const player = await getPlayerByExternalId(String(row.player.id));
     if (!player) continue;
 
+    playerIdsWithStats.add(player.id);
+    gameExternalIdsWithStats.add(String(row.game.id));
     results.push({
       player_id: player.id,
       game_date: gameDate,
@@ -206,8 +211,16 @@ export async function reconcileResultsForDate(date = addDays(isoDate(), -1)) {
   }
 
   const updated = results.length ? await markResults(results) : [];
+  const voided = await voidMissingResults(date, [...gameExternalIdsWithStats], [...playerIdsWithStats]);
   const training = updated.length ? await trainModelWeights() : [];
-  return { date, stat_rows: stats.length, matched_players: results.length, updated_picks: updated.length, training };
+  return {
+    date,
+    stat_rows: stats.length,
+    matched_players: results.length,
+    updated_picks: updated.length,
+    voided_picks: voided.length,
+    training
+  };
 }
 
 export async function reconcileRecentResults(daysBack = 3) {

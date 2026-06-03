@@ -104,7 +104,7 @@ export async function migrate() {
       odds_price NUMERIC,
       is_value_under BOOLEAN DEFAULT false,
       result_value NUMERIC,
-      outcome TEXT CHECK (outcome IN ('hit', 'miss', 'push')),
+      outcome TEXT CHECK (outcome IN ('hit', 'miss', 'push', 'void')),
       created_at TIMESTAMPTZ DEFAULT now(),
       UNIQUE(player_id, game_date, stat_type, line)
     );
@@ -139,5 +139,10 @@ export async function migrate() {
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS formula_summary TEXT;
     ALTER TABLE players ADD COLUMN IF NOT EXISTS roster_status TEXT DEFAULT 'roster';
     ALTER TABLE players ADD COLUMN IF NOT EXISTS last_known_starter BOOLEAN DEFAULT false;
+  `);
+
+  await query(`
+    ALTER TABLE picks DROP CONSTRAINT IF EXISTS picks_outcome_check;
+    ALTER TABLE picks ADD CONSTRAINT picks_outcome_check CHECK (outcome IN ('hit', 'miss', 'push', 'void'));
   `);
 }

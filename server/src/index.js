@@ -33,19 +33,25 @@ app.get("/picks/today", async (req, res, next) => {
 app.get("/picks/history", async (_req, res, next) => {
   try {
     const rows = await pickHistory();
-    const settled = rows.filter((row) => row.outcome && row.outcome !== "push");
-    const wins = settled.filter((row) => row.outcome === "hit").length;
-    const losses = settled.filter((row) => row.outcome === "miss").length;
+    const graded = rows.filter((row) => row.outcome === "hit" || row.outcome === "miss");
+    const wins = graded.filter((row) => row.outcome === "hit").length;
+    const losses = graded.filter((row) => row.outcome === "miss").length;
+    const pushes = rows.filter((row) => row.outcome === "push").length;
+    const voids = rows.filter((row) => row.outcome === "void").length;
+    const settled = graded.length + pushes + voids;
     const profitUnits = Number((wins * 0.91 - losses).toFixed(2));
-    const roi = settled.length ? Number(((profitUnits / settled.length) * 100).toFixed(2)) : 0;
+    const roi = graded.length ? Number(((profitUnits / graded.length) * 100).toFixed(2)) : 0;
     res.json({
       summary: {
         picks: rows.length,
-        settled: settled.length,
+        settled,
+        graded_picks: graded.length,
         wins,
         losses,
-        pushes: rows.filter((row) => row.outcome === "push").length,
-        hit_rate: settled.length ? Number(((wins / settled.length) * 100).toFixed(2)) : 0,
+        pushes,
+        voids,
+        pending: rows.filter((row) => !row.outcome).length,
+        hit_rate: graded.length ? Number(((wins / graded.length) * 100).toFixed(2)) : 0,
         flat_unit_roi: roi,
         unit_size_dollars: config.unitSizeDollars,
         profit_units: profitUnits,
