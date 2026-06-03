@@ -10,7 +10,7 @@ The UI shows the model's rhythm feature as `Energy Index`; the underlying calcul
 - PostgreSQL
 - Vite + React dashboard
 - Railway-ready `railway.toml`
-- `node-cron` daily model job at 10am ET
+- `node-cron` model refreshes through the WNBA betting day
 - Free ESPN WNBA data integration by default, with optional Balldontlie fallback
 - Optional PropLine player-prop integration for real sportsbook/DFS lines
 
@@ -158,7 +158,7 @@ The service runs on its own:
 
 - Startup automation refreshes rosters/logs, grades recent results, and generates current-day picks.
 - Startup automation also trains learned scoring weights when enough settled outcomes exist.
-- A 10am ET cron job generates daily picks.
+- Model refreshes run at 10am, noon, 3pm, 5pm, 7pm, and 9pm ET to catch later prop-line availability.
 - A 1:30am ET cron job grades recent completed picks.
 - A 2pm ET cron job runs a second short result sync for late stat updates.
 

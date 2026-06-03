@@ -184,12 +184,12 @@ function toPickDto(row) {
 await migrate();
 
 if (config.cronEnabled) {
-  cron.schedule("0 10 * * *", async () => {
+  cron.schedule("0 10,12,15,17,19,21 * * *", async () => {
     try {
       const result = await runDailyModel();
-      console.log("daily model run", result);
+      console.log("scheduled model refresh", result);
     } catch (error) {
-      console.error("daily model failed", error);
+      console.error("scheduled model refresh failed", error);
     }
   }, { timezone: "America/New_York" });
 
