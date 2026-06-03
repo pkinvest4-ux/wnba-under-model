@@ -71,7 +71,7 @@ function App() {
       <section className="metrics">
         <Metric icon={<TrendingDown />} label="Today's Value Unders" value={today.picks?.length || 0} />
         <Metric icon={<Activity />} label="Hit Rate" value={`${history.summary?.hit_rate || 0}%`} />
-        <Metric icon={<BarChart3 />} label={`P/L @ ${formatCurrency(history.summary?.unit_size_dollars || 10)}`} value={formatCurrency(history.summary?.estimated_profit_dollars || 0)} />
+        <Metric icon={<BarChart3 />} label={`P/L @ ${formatCurrency(history.summary?.unit_size_dollars || 10)} (${formatJuice(history.summary?.assumed_juice || -115)})`} value={formatCurrency(history.summary?.estimated_profit_dollars || 0)} />
         <Metric icon={<CalendarDays />} label="Settled Picks" value={history.summary?.settled || 0} />
       </section>
 
@@ -311,6 +311,11 @@ function formatDate(date) {
 
 function formatCurrency(value) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(value || 0));
+}
+
+function formatJuice(value) {
+  const number = Number(value || -115);
+  return number > 0 ? `+${number}` : String(number);
 }
 
 function historySubtitle(summary = {}) {

@@ -20,5 +20,6 @@ export const config = {
   cronEnabled: process.env.CRON_ENABLED !== "false",
   autoBootstrap: process.env.AUTO_BOOTSTRAP !== "false",
   unitSizeDollars: Number(process.env.UNIT_SIZE_DOLLARS || 10),
+  assumedJuice: Number(process.env.ASSUMED_JUICE || -115),
   clientDistPath: process.env.CLIENT_DIST_PATH || new URL("../../client/dist", import.meta.url).pathname
 };

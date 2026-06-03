@@ -35,6 +35,7 @@ ENABLE_MOCK_DATA=true
 CRON_ENABLED=true
 AUTO_BOOTSTRAP=true
 UNIT_SIZE_DOLLARS=10
+ASSUMED_JUICE=-115
 PORT=3000
 ```
 
@@ -78,7 +79,7 @@ Optional query:
 
 Returns all prior picks and a flat-unit record summary.
 
-The history summary assumes a flat average bet size configured by `UNIT_SIZE_DOLLARS`, defaulting to `$10`.
+The history summary assumes a flat average bet size configured by `UNIT_SIZE_DOLLARS`, defaulting to `$10`, and default juice configured by `ASSUMED_JUICE`, defaulting to `-115`.
 
 ### `GET /players/:id/trend`
 

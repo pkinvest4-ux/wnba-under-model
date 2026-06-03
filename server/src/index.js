@@ -39,7 +39,8 @@ app.get("/picks/history", async (_req, res, next) => {
     const pushes = rows.filter((row) => row.outcome === "push").length;
     const voids = rows.filter((row) => row.outcome === "void").length;
     const settled = graded.length + pushes + voids;
-    const profitUnits = Number((wins * 0.91 - losses).toFixed(2));
+    const winProfitUnits = Math.abs(config.assumedJuice) >= 100 ? 100 / Math.abs(config.assumedJuice) : Math.abs(config.assumedJuice) / 100;
+    const profitUnits = Number((wins * winProfitUnits - losses).toFixed(2));
     const roi = graded.length ? Number(((profitUnits / graded.length) * 100).toFixed(2)) : 0;
     res.json({
       summary: {
@@ -54,6 +55,8 @@ app.get("/picks/history", async (_req, res, next) => {
         hit_rate: graded.length ? Number(((wins / graded.length) * 100).toFixed(2)) : 0,
         flat_unit_roi: roi,
         unit_size_dollars: config.unitSizeDollars,
+        assumed_juice: config.assumedJuice,
+        win_profit_units: Number(winProfitUnits.toFixed(4)),
         profit_units: profitUnits,
         estimated_profit_dollars: Number((profitUnits * config.unitSizeDollars).toFixed(2))
       },
