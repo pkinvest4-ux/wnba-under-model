@@ -640,6 +640,44 @@ tbody tr.detailRow td {
   min-width: 130px;
 }
 
+.rankBadge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 38px;
+  height: 30px;
+  border: 1px solid #dbc68f;
+  border-radius: 8px;
+  background: #fff8e6;
+  color: #7a5b0b;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.projection {
+  display: grid;
+  gap: 3px;
+  min-width: 150px;
+}
+
+.projection strong {
+  color: #176247;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.projection span {
+  color: #536174;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.projection.muted {
+  color: #657185;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .statPill,
 .sourceBadge,
 .starterBadge,

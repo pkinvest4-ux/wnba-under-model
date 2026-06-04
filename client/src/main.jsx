@@ -85,9 +85,11 @@ function App() {
 
   const todayPicks = today.picks || [];
   const historyPicks = history.picks || [];
-  const activePicks = activeView === "today" ? todayPicks : historyPicks;
+  const topRecommendedPicks = useMemo(() => buildTopRecommendations(todayPicks, 15), [todayPicks]);
+  const activePicks = activeView === "today" ? todayPicks : activeView === "top15" ? topRecommendedPicks : historyPicks;
   const summary = history.summary || {};
   const topPick = todayPicks[0];
+  const bestProfile = topRecommendedPicks[0]?.recommendation_profile;
   const realLineCount = todayPicks.filter(isRealLine).length;
   const highConfidenceCount = todayPicks.filter((pick) => Number(pick.confidence_score) >= 80).length;
 
@@ -178,16 +180,19 @@ function App() {
         <div className="panel picksPanel">
           <div className="panelHeader">
             <div>
-              <p className="sectionLabel">{activeView === "today" ? "Live Card" : activeView === "history" ? "Results Ledger" : "Financials"}</p>
-              <h2>{activeView === "today" ? "Today's Picks" : activeView === "history" ? "Pick History" : "Financial Breakdown"}</h2>
+              <p className="sectionLabel">{viewLabel(activeView).section}</p>
+              <h2>{viewLabel(activeView).title}</h2>
               <span>
                 {activeView === "analytics"
                   ? `${analytics.gradedCount} graded · ${formatCurrency(analytics.netProfitDollars)} net`
-                  : `${visiblePicks.length} shown · ${activeView === "today" ? `${todayPicks.length} active rows` : historySubtitle(summary)}`}
+                  : activeView === "top15"
+                    ? `${visiblePicks.length} shown · ${bestProfile ? `${bestProfile.projected_hit_rate}% top profile` : "waiting for picks"}`
+                    : `${visiblePicks.length} shown · ${activeView === "today" ? `${todayPicks.length} active rows` : historySubtitle(summary)}`}
               </span>
             </div>
             <div className="segmented" aria-label="Pick view">
               <button className={activeView === "today" ? "active" : ""} onClick={() => { setActiveView("today"); setExpandedPickId(null); }}>Today</button>
+              <button className={activeView === "top15" ? "active" : ""} onClick={() => { setActiveView("top15"); setExpandedPickId(null); }}>Top 15</button>
               <button className={activeView === "history" ? "active" : ""} onClick={() => { setActiveView("history"); setExpandedPickId(null); }}>History</button>
               <button className={activeView === "analytics" ? "active" : ""} onClick={() => { setActiveView("analytics"); setExpandedPickId(null); }}>Analytics</button>
             </div>
@@ -315,6 +320,75 @@ function FinancialAnalytics({ analytics, summary }) {
   );
 }
 
+function buildTopRecommendations(picks, limit = 15) {
+  return (picks || [])
+    .map((pick) => {
+      const profile = recommendationProfile(pick);
+      const score =
+        profile.projected_hit_rate * 100 +
+        Number(pick.confidence_score || 0) * 4 +
+        Number(pick.under_hit_rate || 0) * 100 +
+        (pick.stat_type === "assists" ? 80 : 0) +
+        (pick.bettable_status === "watchlist" ? 45 : 0) -
+        (hasRiskTag(pick, "Low sample") ? 250 : 0) -
+        (hasRiskTag(pick, "Heavy minutes") ? 220 : 0) -
+        (pick.stat_type === "pra" ? 140 : 0) -
+        (pick.stat_type === "rebounds" && Number(pick.line || 0) > 6.5 ? 220 : 0);
+
+      return {
+        ...pick,
+        recommendation_score: Number(score.toFixed(2)),
+        recommendation_profile: profile
+      };
+    })
+    .sort((a, b) => b.recommendation_score - a.recommendation_score || b.confidence_score - a.confidence_score || String(a.player_name).localeCompare(String(b.player_name)))
+    .slice(0, limit)
+    .map((pick, index) => ({ ...pick, recommendation_rank: index + 1 }));
+}
+
+function recommendationProfile(pick) {
+  const lowSample = hasRiskTag(pick, "Low sample");
+  const heavyMinutes = hasRiskTag(pick, "Heavy minutes");
+  const clean = !lowSample && !heavyMinutes;
+  const assists = pick.stat_type === "assists";
+  const points = pick.stat_type === "points";
+  const rebounds = pick.stat_type === "rebounds";
+  const b2bOrHistory = hasRiskTag(pick, "B2B") || hasRiskTag(pick, "Strong under history");
+  const watchlist = pick.bettable_status === "watchlist";
+  const confidence = Number(pick.confidence_score || 0);
+  const underRate = Number(pick.under_hit_rate || 0);
+  const lowerRebound = rebounds && Number(pick.line || 0) <= 6.5;
+
+  if (assists && b2bOrHistory && clean) {
+    return { projected_hit_rate: 86, label: "Elite assists profile" };
+  }
+  if (watchlist && (assists || points) && clean) {
+    return { projected_hit_rate: 76, label: "Watchlist assists/points profile" };
+  }
+  if (assists && confidence >= 80 && clean) {
+    return { projected_hit_rate: 68, label: "High-confidence assists profile" };
+  }
+  if (confidence >= 80 && underRate >= 0.6 && pick.stat_type !== "pra" && clean) {
+    return { projected_hit_rate: 67, label: "Premium high-confidence profile" };
+  }
+  if (confidence >= 80 && pick.stat_type !== "pra" && (assists || points || lowerRebound) && clean) {
+    return { projected_hit_rate: 68, label: "Premium no-PRA profile" };
+  }
+  if (confidence >= 85 && (assists || points || lowerRebound) && clean) {
+    return { projected_hit_rate: 67, label: "Strong confidence profile" };
+  }
+  if (underRate >= 0.7 && confidence >= 80 && clean) {
+    return { projected_hit_rate: 66, label: "Strong under-history profile" };
+  }
+  if (confidence >= 80 && clean) {
+    return { projected_hit_rate: 64, label: "High-confidence research profile" };
+  }
+  if (lowSample || heavyMinutes) {
+    return { projected_hit_rate: 54, label: lowSample ? "Caution: low sample" : "Caution: heavy minutes" };
+  }
+  return { projected_hit_rate: Math.max(50, Math.min(63, Math.round(Number(pick.confidence_score || 50) * 0.72))), label: "Broad research profile" };
+}
+
 function InsightCard({ label, value, detail, tone }) {
   return (
     <div className={`insightCard ${tone || ""}`}>
@@ -412,16 +486,19 @@ function SliceTable({ title, rows }) {
 
 function PickBoard({ picks, loading, activeView, expandedPickId, snapshotsByPickId, onToggle, onTrack }) {
   const showResult = activeView === "history";
-  const colSpan = showResult ? 10 : 9;
+  const showRecommendation = activeView === "top15";
+  const colSpan = (showResult ? 10 : 9) + (showRecommendation ? 2 : 0);
 
   return (
     <table>
       <thead>
         <tr>
           {showResult && <th>Date</th>}
+          {showRecommendation && <th>Rank</th>}
           <th>Player</th>
           <th>Stat Line</th>
           {showResult && <th>Result</th>}
+          {showRecommendation && <th>Projected</th>}
           <th>Source</th>
           <th>Status</th>
           <th>Why</th>
@@ -443,9 +520,11 @@ function PickBoard({ picks, loading, activeView, expandedPickId, snapshotsByPick
             <React.Fragment key={pick.id}>
               <tr className={`${activeView === "history" ? outcomeRowClass(pick.outcome) : ""} ${expanded ? "selected" : ""}`}>
                 {showResult && <td className="dateCell">{formatDate(pick.game_date)}</td>}
+                {showRecommendation && <td><RankBadge rank={pick.recommendation_rank} /></td>}
                 <td><PlayerCell pick={pick} /></td>
                 <td><LineCell pick={pick} /></td>
                 {showResult && <td><OutcomeBadge outcome={pick.outcome} value={pick.result_value} /></td>}
+                {showRecommendation && <td><RecommendationCell profile={pick.recommendation_profile} /></td>}
                 <td><SourceBadge pick={pick} /></td>
                 <td><StatusStack pick={pick} /></td>
                 <td><ReasonChips reasons={pick.reasons} formula={pick.formula_summary} breakdown={pick.factor_breakdown} /></td>
@@ -501,6 +580,7 @@ function PickDetails({ pick, snapshots = [] }) {
         <DetailStat label="Real Line" value={pick.real_line ?? "n/a"} />
         <DetailStat label="Line Gap" value={pick.line_gap ?? "n/a"} />
         <DetailStat label="Board Status" value={filterLabel(pick.bettable_status || "research")} />
+        {pick.recommendation_profile && <DetailStat label="Projected Hit" value={`${pick.recommendation_profile.projected_hit_rate}%`} />}
         <DetailStat label="Odds Price" value={pick.odds_price ?? "n/a"} />
         <DetailStat label="Under Hit Rate" value={formatPercent(pick.under_hit_rate)} />
         <DetailStat label="Recent Minutes" value={formatNumber(pick.recent_minutes_avg)} />
@@ -522,7 +602,7 @@ function PickDetails({ pick, snapshots = [] }) {
           <div className="reasonChips expanded risk">
             {(pick.risk_tags?.length ? pick.risk_tags : ["No major risk tag"]).map((tag) => <span key={tag}>{tag}</span>)}
           </div>
-          <p className="watchlistText">{pick.watchlist_reason || "Stored as a research signal for later optimization."}</p>
+          <p className="watchlistText">{pick.recommendation_profile?.label || pick.watchlist_reason || "Stored as a research signal for later optimization."}</p>
         </div>
       </div>
 
@@ -606,6 +686,20 @@ function PlayerCell({ pick }) {
         <strong>{pick.player_name} {pick.starter && <span className="starterBadge">Starter</span>}</strong>
         <span>{pick.team || "WNBA"}</span>
       </div>
+    </div>
+  );
+}
+
+function RankBadge({ rank }) {
+  return <span className="rankBadge">#{rank || "-"}</span>;
+}
+
+function RecommendationCell({ profile }) {
+  if (!profile) return <span className="projection muted">n/a</span>;
+  return (
+    <div className="projection">
+      <strong>{profile.projected_hit_rate}%</strong>
+      <span>{profile.label}</span>
     </div>
   );
 }
@@ -717,9 +811,9 @@ function applyFilters(picks, filters, searchTerm, activeView) {
   return picks.filter((pick) => {
     const outcome = pick.outcome || "pending";
     if (activeView === "history" && filters.outcome !== "all" && outcome !== filters.outcome) return false;
-    if (filters.boardMode === "bettable" && pick.bettable_status !== "bettable") return false;
-    if (filters.boardMode === "watchlist" && pick.bettable_status !== "watchlist") return false;
-    if (filters.boardMode === "tracked" && !pick.tracked_bet) return false;
+    if (activeView !== "top15" && filters.boardMode === "bettable" && pick.bettable_status !== "bettable") return false;
+    if (activeView !== "top15" && filters.boardMode === "watchlist" && pick.bettable_status !== "watchlist") return false;
+    if (activeView !== "top15" && filters.boardMode === "tracked" && !pick.tracked_bet) return false;
     if (filters.stat !== "all" && pick.stat_type !== filters.stat) return false;
     if (filters.source !== "all" && sourceKey(pick) !== filters.source) return false;
     if (filters.lineQuality !== "all" && (pick.line_match_quality || "model_only") !== filters.lineQuality) return false;
@@ -741,6 +835,7 @@ function applyFilters(picks, filters, searchTerm, activeView) {
       pick.model_version,
       pick.bettable_status,
       pick.watchlist_reason,
+      pick.recommendation_profile?.label,
       pick.energy_index,
       ...(pick.reasons || []),
       ...(pick.risk_tags || [])
@@ -926,10 +1021,22 @@ function uniqueSorted(values) {
   return [...new Set(values.filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b)));
 }
 
+function viewLabel(view) {
+  if (view === "top15") return { section: "Premium Card", title: "Top 15 Recommended" };
+  if (view === "history") return { section: "Results Ledger", title: "Pick History" };
+  if (view === "analytics") return { section: "Financials", title: "Financial Breakdown" };
+  return { section: "Live Card", title: "Today's Picks" };
+}
+
+function hasRiskTag(pick, tag) {
+  return (pick.risk_tags || []).includes(tag);
+}
+
 function countActiveFilters(filters, searchTerm, activeView) {
   let count = searchTerm.trim() ? 1 : 0;
   for (const [key, value] of Object.entries(filters)) {
     if (key === "outcome" && activeView !== "history") continue;
+    if (key === "boardMode" && activeView === "top15") continue;
     if (key === "minConfidence") {
       if (Number(value) > 0) count += 1;
     } else if (value !== "all") {
@@ -1023,6 +1130,10 @@ function downloadCsv(filename, picks) {
     "line_match_quality",
     "line_source",
     "bettable_status",
+    "recommendation_rank",
+    "recommendation_score",
+    "recommendation_projected_hit_rate",
+    "recommendation_profile",
     "watchlist_reason",
     "confidence_score",
     "energy_index",
@@ -1037,7 +1148,11 @@ function downloadCsv(filename, picks) {
     "outcome",
     "result_value"
   ];
-  const rows = [columns.join(",")].concat((picks || []).map((pick) => columns.map((column) => csvValue(Array.isArray(pick[column]) ? pick[column].join("|") : pick[column])).join(",")));
+  const rows = [columns.join(",")].concat((picks || []).map((pick) => columns.map((column) => {
+    if (column === "recommendation_projected_hit_rate") return csvValue(pick.recommendation_profile?.projected_hit_rate);
+    if (column === "recommendation_profile") return csvValue(pick.recommendation_profile?.label);
+    return csvValue(Array.isArray(pick[column]) ? pick[column].join("|") : pick[column]);
+  }).join(",")));
   const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
