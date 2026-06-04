@@ -15,16 +15,27 @@ export function dateOnly(value) {
 }
 
 export function fatigueCycleScore(firstTrackedGameDate, gameDate) {
+  const days = fatigueCycleDay(firstTrackedGameDate, gameDate);
+  return Number(((Math.sin((2 * Math.PI * days) / 28 - Math.PI / 2) + 1) / 2).toFixed(4));
+}
+
+export function fatigueCycleDay(firstTrackedGameDate, gameDate) {
   const start = new Date(`${dateOnly(firstTrackedGameDate)}T12:00:00Z`);
   const game = new Date(`${dateOnly(gameDate)}T12:00:00Z`);
   const days = Math.max(0, Math.round((game - start) / 86400000));
-  return Number(((Math.sin((2 * Math.PI * days) / 28 - Math.PI / 2) + 1) / 2).toFixed(4));
+  return days % 28;
 }
 
 export function energyBand(score) {
   if (score >= 0.67) return "low";
   if (score >= 0.34) return "medium";
   return "high";
+}
+
+export function cycleWindow(score) {
+  if (score >= 0.67) return "low_output_window";
+  if (score >= 0.34) return "neutral_window";
+  return "strong_output_window";
 }
 
 export function statValue(log, statType) {
@@ -112,6 +123,7 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
   const daysRest = previous
     ? Math.max(0, Math.round((new Date(`${dateOnly(gameDate)}T12:00:00Z`) - new Date(`${dateOnly(previous.game_date)}T12:00:00Z`)) / 86400000) - 1)
     : 3;
+  const fatigue_cycle_day = fatigueCycleDay(player.first_tracked_game_date || gameDate, gameDate);
   const fatigue_cycle_score = fatigueCycleScore(player.first_tracked_game_date || gameDate, gameDate);
   const recent_minutes_avg = rollingMinutes(sortedLogs, gameDate);
   const back_to_back = daysRest === 0;
@@ -153,6 +165,8 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
       risk_tags,
       confidence_score,
       fatigue_cycle_score,
+      fatigue_cycle_day,
+      cycle_window: cycleWindow(fatigue_cycle_score),
       energy_band: energyBand(fatigue_cycle_score),
       opponent_def_rating: opponentDefRating,
       recent_minutes_avg,

@@ -322,6 +322,7 @@ function FinancialAnalytics({ analytics, summary }) {
 
 function buildTopRecommendations(picks, limit = 15) {
   return (picks || [])
+    .filter((pick) => pick.bettable_status === "bettable" && isRealLine(pick))
     .map((pick) => {
       const profile = recommendationProfile(pick);
       const score =
@@ -581,6 +582,9 @@ function PickDetails({ pick, snapshots = [] }) {
         <DetailStat label="Line Gap" value={pick.line_gap ?? "n/a"} />
         <DetailStat label="Board Status" value={filterLabel(pick.bettable_status || "research")} />
         {pick.recommendation_profile && <DetailStat label="Projected Hit" value={`${pick.recommendation_profile.projected_hit_rate}%`} />}
+        <DetailStat label="Energy Window" value={energyWindowLabel(pick.cycle_window)} />
+        <DetailStat label="Closing Line" value={pick.closing_line ?? "pending"} />
+        <DetailStat label="Closing Source" value={pick.closing_line_source ? filterLabel(sourceKey({ line_source: pick.closing_line_source })) : "pending"} />
         <DetailStat label="Odds Price" value={pick.odds_price ?? "n/a"} />
         <DetailStat label="Under Hit Rate" value={formatPercent(pick.under_hit_rate)} />
         <DetailStat label="Recent Minutes" value={formatNumber(pick.recent_minutes_avg)} />
@@ -1068,6 +1072,13 @@ function lineSourceLabel(pick) {
   return pick.bookmaker ? `${pick.bookmaker} real line` : "Real line";
 }
 
+function energyWindowLabel(value) {
+  if (value === "low_output_window") return "Low Energy";
+  if (value === "neutral_window") return "Neutral";
+  if (value === "strong_output_window") return "High Energy";
+  return "n/a";
+}
+
 function filterLabel(value) {
   if (value === "all") return "All";
   if (value === "pra") return "PRA";
@@ -1137,6 +1148,9 @@ function downloadCsv(filename, picks) {
     "watchlist_reason",
     "confidence_score",
     "energy_index",
+    "fatigue_cycle_score",
+    "fatigue_cycle_day",
+    "cycle_window",
     "model_version",
     "under_hit_rate",
     "recent_minutes_avg",
@@ -1145,6 +1159,13 @@ function downloadCsv(filename, picks) {
     "reasons",
     "risk_tags",
     "tracked_bet",
+    "closing_line",
+    "closing_real_line",
+    "closing_line_gap",
+    "closing_line_source",
+    "closing_bookmaker",
+    "closing_odds_price",
+    "closing_line_checked_at",
     "outcome",
     "result_value"
   ];

@@ -164,17 +164,19 @@ export async function savePicks(playerId, gameId, gameDate, picks) {
       await client.query(
         `INSERT INTO picks (
           player_id, game_id, game_date, stat_type, line, confidence_score, fatigue_cycle_score,
-          energy_band, opponent_def_rating, recent_minutes_avg, days_rest, back_to_back,
+          fatigue_cycle_day, cycle_window, energy_band, opponent_def_rating, recent_minutes_avg, days_rest, back_to_back,
           under_hit_rate, rest_risk, load_risk, opponent_risk, b2b_risk, model_version,
           reasons, factor_breakdown, formula_summary, line_source, bookmaker, odds_price,
           estimated_line, real_line, line_gap, line_match_quality, line_alerts,
           bettable_status, watchlist_reason, risk_tags, is_value_under
         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19::jsonb, $20::jsonb, $21, $22, $23, $24, $25, $26, $27, $28, $29::jsonb, $30, $31, $32::jsonb, $33)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21::jsonb, $22::jsonb, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32::jsonb, $33, $34, $35::jsonb, $36)
          ON CONFLICT (player_id, game_date, stat_type, line) DO UPDATE SET
            game_id = EXCLUDED.game_id,
            confidence_score = EXCLUDED.confidence_score,
            fatigue_cycle_score = EXCLUDED.fatigue_cycle_score,
+           fatigue_cycle_day = EXCLUDED.fatigue_cycle_day,
+           cycle_window = EXCLUDED.cycle_window,
            energy_band = EXCLUDED.energy_band,
            opponent_def_rating = EXCLUDED.opponent_def_rating,
            recent_minutes_avg = EXCLUDED.recent_minutes_avg,
@@ -209,6 +211,8 @@ export async function savePicks(playerId, gameId, gameDate, picks) {
           pick.line,
           pick.confidence_score,
           pick.fatigue_cycle_score,
+          pick.fatigue_cycle_day ?? null,
+          pick.cycle_window || null,
           pick.energy_band,
           pick.opponent_def_rating,
           pick.recent_minutes_avg,
@@ -431,7 +435,70 @@ export async function markResults(results) {
               WHEN 'pra' THEN ($3::numeric + $4::numeric + $5::numeric)
             END = line THEN 'push'
           ELSE 'miss'
-        END
+        END,
+        closing_line = COALESCE((
+          SELECT observed_line
+          FROM line_snapshots
+          WHERE line_snapshots.player_id = picks.player_id
+            AND line_snapshots.game_date = picks.game_date
+            AND line_snapshots.stat_type = picks.stat_type
+          ORDER BY created_at DESC
+          LIMIT 1
+        ), closing_line),
+        closing_real_line = (
+          SELECT real_line
+          FROM line_snapshots
+          WHERE line_snapshots.player_id = picks.player_id
+            AND line_snapshots.game_date = picks.game_date
+            AND line_snapshots.stat_type = picks.stat_type
+          ORDER BY created_at DESC
+          LIMIT 1
+        ),
+        closing_line_gap = (
+          SELECT line_gap
+          FROM line_snapshots
+          WHERE line_snapshots.player_id = picks.player_id
+            AND line_snapshots.game_date = picks.game_date
+            AND line_snapshots.stat_type = picks.stat_type
+          ORDER BY created_at DESC
+          LIMIT 1
+        ),
+        closing_line_source = (
+          SELECT line_source
+          FROM line_snapshots
+          WHERE line_snapshots.player_id = picks.player_id
+            AND line_snapshots.game_date = picks.game_date
+            AND line_snapshots.stat_type = picks.stat_type
+          ORDER BY created_at DESC
+          LIMIT 1
+        ),
+        closing_bookmaker = (
+          SELECT bookmaker
+          FROM line_snapshots
+          WHERE line_snapshots.player_id = picks.player_id
+            AND line_snapshots.game_date = picks.game_date
+            AND line_snapshots.stat_type = picks.stat_type
+          ORDER BY created_at DESC
+          LIMIT 1
+        ),
+        closing_odds_price = (
+          SELECT odds_price
+          FROM line_snapshots
+          WHERE line_snapshots.player_id = picks.player_id
+            AND line_snapshots.game_date = picks.game_date
+            AND line_snapshots.stat_type = picks.stat_type
+          ORDER BY created_at DESC
+          LIMIT 1
+        ),
+        closing_line_checked_at = (
+          SELECT created_at
+          FROM line_snapshots
+          WHERE line_snapshots.player_id = picks.player_id
+            AND line_snapshots.game_date = picks.game_date
+            AND line_snapshots.stat_type = picks.stat_type
+          ORDER BY created_at DESC
+          LIMIT 1
+        )
       WHERE player_id = $1 AND game_date = $2
       RETURNING *
     `, [result.player_id, result.game_date, result.points, result.rebounds, result.assists]);
@@ -446,7 +513,70 @@ export async function voidMissingResults(gameDate, gameExternalIds, playerIdsWit
   const { rows } = await query(`
     UPDATE picks
     SET outcome = 'void',
-      result_value = NULL
+      result_value = NULL,
+      closing_line = COALESCE((
+        SELECT observed_line
+        FROM line_snapshots
+        WHERE line_snapshots.player_id = picks.player_id
+          AND line_snapshots.game_date = picks.game_date
+          AND line_snapshots.stat_type = picks.stat_type
+        ORDER BY created_at DESC
+        LIMIT 1
+      ), closing_line),
+      closing_real_line = (
+        SELECT real_line
+        FROM line_snapshots
+        WHERE line_snapshots.player_id = picks.player_id
+          AND line_snapshots.game_date = picks.game_date
+          AND line_snapshots.stat_type = picks.stat_type
+        ORDER BY created_at DESC
+        LIMIT 1
+      ),
+      closing_line_gap = (
+        SELECT line_gap
+        FROM line_snapshots
+        WHERE line_snapshots.player_id = picks.player_id
+          AND line_snapshots.game_date = picks.game_date
+          AND line_snapshots.stat_type = picks.stat_type
+        ORDER BY created_at DESC
+        LIMIT 1
+      ),
+      closing_line_source = (
+        SELECT line_source
+        FROM line_snapshots
+        WHERE line_snapshots.player_id = picks.player_id
+          AND line_snapshots.game_date = picks.game_date
+          AND line_snapshots.stat_type = picks.stat_type
+        ORDER BY created_at DESC
+        LIMIT 1
+      ),
+      closing_bookmaker = (
+        SELECT bookmaker
+        FROM line_snapshots
+        WHERE line_snapshots.player_id = picks.player_id
+          AND line_snapshots.game_date = picks.game_date
+          AND line_snapshots.stat_type = picks.stat_type
+        ORDER BY created_at DESC
+        LIMIT 1
+      ),
+      closing_odds_price = (
+        SELECT odds_price
+        FROM line_snapshots
+        WHERE line_snapshots.player_id = picks.player_id
+          AND line_snapshots.game_date = picks.game_date
+          AND line_snapshots.stat_type = picks.stat_type
+        ORDER BY created_at DESC
+        LIMIT 1
+      ),
+      closing_line_checked_at = (
+        SELECT created_at
+        FROM line_snapshots
+        WHERE line_snapshots.player_id = picks.player_id
+          AND line_snapshots.game_date = picks.game_date
+          AND line_snapshots.stat_type = picks.stat_type
+        ORDER BY created_at DESC
+        LIMIT 1
+      )
     FROM games
     WHERE picks.game_id = games.id
       AND picks.game_date = $1
