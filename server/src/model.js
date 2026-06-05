@@ -203,22 +203,15 @@ function lineAlerts({ realLine, lineGap, lineMatchQuality }) {
   return alerts;
 }
 
-function classifyPick({ confidence_score, lineMatchQuality, realLine, lineGap, risk_tags }) {
+function classifyPick({ confidence_score, realLine }) {
   const hasRealLine = realLine != null;
   const confidence = Number(confidence_score || 0);
-  const marketFit = lineMatchQuality === "near_market" || lineMatchQuality === "close_market";
-  const wideGap = lineMatchQuality === "wide_gap";
-  const lowSample = risk_tags.includes("Low sample");
-  const minutesRisk = risk_tags.includes("Minutes uncertainty");
 
-  if (hasRealLine && marketFit && confidence >= 72 && !lowSample && !minutesRisk) {
-    return { bettable_status: "bettable", watchlist_reason: "Real line with usable model fit" };
+  if (hasRealLine && confidence > 65) {
+    return { bettable_status: "bettable", watchlist_reason: "Real line with under signal" };
   }
-  if (hasRealLine && confidence >= 75) {
-    return {
-      bettable_status: "watchlist",
-      watchlist_reason: wideGap ? `Real line, but model gap ${lineGap > 0 ? "+" : ""}${lineGap}` : "Real line with caution tags"
-    };
+  if (hasRealLine) {
+    return { bettable_status: "research", watchlist_reason: "Real line stored, below under threshold" };
   }
   if (!hasRealLine && confidence >= 75) {
     return { bettable_status: "watchlist", watchlist_reason: "Strong model signal waiting on market line" };

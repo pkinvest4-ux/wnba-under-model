@@ -322,19 +322,22 @@ function FinancialAnalytics({ analytics, summary }) {
 
 function buildTopRecommendations(picks, limit = 15) {
   return (picks || [])
-    .filter((pick) => pick.bettable_status === "bettable" && isRealLine(pick))
+    .filter((pick) => isRealLine(pick) && pick.is_value_under !== false)
     .map((pick) => {
       const profile = recommendationProfile(pick);
+      const energyScore = energyContributionPercent(pick);
       const score =
         profile.projected_hit_rate * 100 +
         Number(pick.confidence_score || 0) * 4 +
         Number(pick.under_hit_rate || 0) * 100 +
-        (pick.stat_type === "assists" ? 80 : 0) +
-        (pick.bettable_status === "watchlist" ? 45 : 0) -
+        energyScore * 3 +
+        (pick.energy_index === "low" ? 120 : pick.energy_index === "medium" ? 35 : 0) +
+        (pick.stat_type === "assists" ? 45 : 0) +
+        (pick.bettable_status === "bettable" ? 60 : 0) -
         (hasRiskTag(pick, "Low sample") ? 250 : 0) -
         (hasRiskTag(pick, "Heavy minutes") ? 220 : 0) -
-        (pick.stat_type === "pra" ? 140 : 0) -
-        (pick.stat_type === "rebounds" && Number(pick.line || 0) > 6.5 ? 220 : 0);
+        (pick.stat_type === "pra" ? 70 : 0) -
+        (pick.stat_type === "rebounds" && Number(pick.line || 0) > 6.5 ? 120 : 0);
 
       return {
         ...pick,
@@ -347,6 +350,11 @@ function buildTopRecommendations(picks, limit = 15) {
     .map((pick, index) => ({ ...pick, recommendation_rank: index + 1 }));
 }
 
+function energyContributionPercent(pick) {
+  const energyFactor = (pick.factor_breakdown || []).find((item) => item.label === "Energy Index");
+  return Number(energyFactor?.percent || 0);
+}
+
 function recommendationProfile(pick) {
   const lowSample = hasRiskTag(pick, "Low sample");
   const heavyMinutes = hasRiskTag(pick, "Heavy minutes");
@@ -355,22 +363,26 @@ function recommendationProfile(pick) {
   const points = pick.stat_type === "points";
   const rebounds = pick.stat_type === "rebounds";
   const b2bOrHistory = hasRiskTag(pick, "B2B") || hasRiskTag(pick, "Strong under history");
-  const watchlist = pick.bettable_status === "watchlist";
   const confidence = Number(pick.confidence_score || 0);
   const underRate = Number(pick.under_hit_rate || 0);
   const lowerRebound = rebounds && Number(pick.line || 0) <= 6.5;
+  const lowEnergy = pick.energy_index === "low" || pick.cycle_window === "low_output_window";
+  const energyContribution = energyContributionPercent(pick);
 
-  if (assists && b2bOrHistory && clean) {
-    return { projected_hit_rate: 86, label: "Elite assists profile" };
+  if (lowEnergy && confidence >= 80 && clean) {
+    return { projected_hit_rate: 86, label: "Real-line Energy profile" };
   }
-  if (watchlist && (assists || points) && clean) {
-    return { projected_hit_rate: 76, label: "Watchlist assists/points profile" };
+  if (assists && b2bOrHistory && clean) {
+    return { projected_hit_rate: 84, label: "Elite assists under profile" };
+  }
+  if (energyContribution >= 25 && confidence >= 75 && clean) {
+    return { projected_hit_rate: 76, label: "Energy-led under profile" };
   }
   if (assists && confidence >= 80 && clean) {
-    return { projected_hit_rate: 68, label: "High-confidence assists profile" };
+    return { projected_hit_rate: 72, label: "High-confidence assists profile" };
   }
   if (confidence >= 80 && underRate >= 0.6 && pick.stat_type !== "pra" && clean) {
-    return { projected_hit_rate: 67, label: "Premium high-confidence profile" };
+    return { projected_hit_rate: 70, label: "Premium high-confidence profile" };
   }
   if (confidence >= 80 && pick.stat_type !== "pra" && (assists || points || lowerRebound) && clean) {
     return { projected_hit_rate: 68, label: "Premium no-PRA profile" };
