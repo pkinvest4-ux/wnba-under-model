@@ -171,6 +171,16 @@ app.post("/admin/reconcile-results", async (req, res, next) => {
   }
 });
 
+app.post("/admin/reconcile-recent", async (req, res, next) => {
+  try {
+    const daysBack = Number(req.body?.days_back || req.query.days_back || 3);
+    const result = await runResultSync("admin recent results sync", daysBack);
+    res.json({ ok: true, result });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.use((req, res, next) => {
   if (req.path === "/" || !path.extname(req.path)) {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
@@ -246,6 +256,24 @@ function toPickDto(row) {
 
 await migrate();
 
+let resultSyncRunning = false;
+
+async function runResultSync(label, daysBack = 3) {
+  if (resultSyncRunning) {
+    console.log(`${label} skipped; previous results sync still running`);
+    return { skipped: true, reason: "previous results sync still running" };
+  }
+
+  resultSyncRunning = true;
+  try {
+    const result = await reconcileRecentResults(daysBack);
+    console.log(label, result);
+    return result;
+  } finally {
+    resultSyncRunning = false;
+  }
+}
+
 if (config.cronEnabled) {
   cron.schedule("0 10,12,15,17,19,21 * * *", async () => {
     try {
@@ -265,21 +293,19 @@ if (config.cronEnabled) {
     }
   }, { timezone: "America/New_York" });
 
-  cron.schedule("30 1 * * *", async () => {
+  cron.schedule("*/30 22-23,0-5 * * *", async () => {
     try {
-      const result = await reconcileRecentResults(3);
-      console.log("overnight results sync", result);
+      await runResultSync("automatic results sync", 3);
     } catch (error) {
-      console.error("overnight results sync failed", error);
+      console.error("automatic results sync failed", error);
     }
   }, { timezone: "America/New_York" });
 
-  cron.schedule("0 14 * * *", async () => {
+  cron.schedule("0 6-14 * * *", async () => {
     try {
-      const result = await reconcileRecentResults(1);
-      console.log("afternoon results sync", result);
+      await runResultSync("daytime results backfill", 3);
     } catch (error) {
-      console.error("afternoon results sync failed", error);
+      console.error("daytime results backfill failed", error);
     }
   }, { timezone: "America/New_York" });
 }

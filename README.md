@@ -163,8 +163,8 @@ The service runs on its own:
 - Startup automation keeps feature/outcome data ready for later analysis.
 - Model refreshes run at 10am, noon, 3pm, 5pm, 7pm, and 9pm ET to catch later prop-line availability.
 - Pregame checks run every 15 minutes from 10am-11pm ET and refresh the full card around 75, 45, and 20 minutes before tip, up to `PREGAME_REFRESH_WINDOW_MINUTES`, so new real-line picks can be added if they start meeting criteria.
-- A 1:30am ET cron job grades recent completed picks.
-- A 2pm ET cron job runs a second short result sync for late stat updates.
+- Result sync runs every 30 minutes from 10pm-5:59am ET, then hourly from 6am-2pm ET, so completed games keep getting retried until stats are available and picks settle.
+- The app also grades recent results on startup through `AUTO_BOOTSTRAP=true`, which helps after deploys or service restarts.
 
 If you prefer separate Railway cron services, set `CRON_ENABLED=false` on the web service and configure cron services to execute:
 
