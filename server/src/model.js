@@ -6,7 +6,7 @@ const FIXED_WEIGHTS = {
   load_weight: 0.7,
   b2b_weight: 0.55,
   opponent_weight: 0.45,
-  under_hit_rate_weight: 0.55
+  under_hit_rate_weight: 0.25
 };
 
 export function dateOnly(value) {
@@ -19,6 +19,11 @@ export function fatigueCycleScore(firstTrackedGameDate, gameDate) {
   return Number(((Math.sin((2 * Math.PI * days) / 28 - Math.PI / 2) + 1) / 2).toFixed(4));
 }
 
+export function fatigueCycleRisk(score) {
+  const value = Number(score || 0);
+  return Number(Math.min(1, value >= 0.58 ? value + 0.18 : value).toFixed(4));
+}
+
 export function fatigueCycleDay(firstTrackedGameDate, gameDate) {
   const start = new Date(`${dateOnly(firstTrackedGameDate)}T12:00:00Z`);
   const game = new Date(`${dateOnly(gameDate)}T12:00:00Z`);
@@ -27,13 +32,13 @@ export function fatigueCycleDay(firstTrackedGameDate, gameDate) {
 }
 
 export function energyBand(score) {
-  if (score >= 0.67) return "low";
+  if (score >= 0.58) return "low";
   if (score >= 0.34) return "medium";
   return "high";
 }
 
 export function cycleWindow(score) {
-  if (score >= 0.67) return "low_output_window";
+  if (score >= 0.58) return "low_output_window";
   if (score >= 0.34) return "neutral_window";
   return "strong_output_window";
 }
@@ -83,10 +88,11 @@ export function rollingMinutes(logs, gameDate) {
 export function scoreUnder({ fatigue_cycle_score, days_rest, recent_minutes_avg, back_to_back, opponent_def_rating, under_hit_rate }) {
   const risks = normalizedRisks({ days_rest, recent_minutes_avg, back_to_back, opponent_def_rating });
   const personal = Number(under_hit_rate ?? 0.5);
+  const cycleRisk = fatigueCycleRisk(fatigue_cycle_score);
 
   const z =
     FIXED_WEIGHTS.intercept +
-    FIXED_WEIGHTS.fatigue_cycle_weight * Number(fatigue_cycle_score || 0) +
+    FIXED_WEIGHTS.fatigue_cycle_weight * cycleRisk +
     FIXED_WEIGHTS.rest_weight * risks.rest_risk +
     FIXED_WEIGHTS.load_weight * risks.load_risk +
     FIXED_WEIGHTS.b2b_weight * risks.b2b_risk +
@@ -99,10 +105,11 @@ export function scoreUnder({ fatigue_cycle_score, days_rest, recent_minutes_avg,
 export function scoreUnderWithWeights(features, weightsByStat, statType) {
   const weights = weightsByStat?.[statType];
   if (!weights) return { confidence_score: scoreUnder(features), model_version: "fixed_v1" };
+  const cycleRisk = fatigueCycleRisk(features.fatigue_cycle_score);
 
   const z =
     Number(weights.intercept) +
-    Number(weights.fatigue_cycle_weight) * Number(features.fatigue_cycle_score || 0) +
+    Number(weights.fatigue_cycle_weight) * cycleRisk +
     Number(weights.rest_weight) * Number(features.rest_risk || 0) +
     Number(weights.load_weight) * Number(features.load_risk || 0) +
     Number(weights.b2b_weight) * Number(features.b2b_risk || 0) +
@@ -141,6 +148,7 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
     const under_hit_rate = underHitRate(sortedLogs, statType, line);
     const baseFeatures = {
       fatigue_cycle_score,
+      fatigue_cycle_risk: fatigueCycleRisk(fatigue_cycle_score),
       days_rest: daysRest,
       recent_minutes_avg,
       back_to_back,
@@ -258,7 +266,7 @@ export function pickReasons(features, breakdown = []) {
   if (Number(features.under_hit_rate || 0) >= 0.62) {
     reasons.push({ label: `${Math.round(Number(features.under_hit_rate) * 100)}% under rate`, score: features.under_hit_rate });
   }
-  if (Number(features.fatigue_cycle_score || 0) >= 0.67) {
+  if (Number(features.fatigue_cycle_score || 0) >= 0.58) {
     reasons.push({ label: "Low Energy Index", score: features.fatigue_cycle_score });
   }
   if (Number(features.opponent_def_rating || 100) >= 101) {
@@ -281,7 +289,7 @@ export function pickReasons(features, breakdown = []) {
 export function factorBreakdown(features, learnedWeights) {
   const weights = learnedWeights || FIXED_WEIGHTS;
   const factors = [
-    { key: "fatigue_cycle_score", label: "Energy Index", weight: Number(weights.fatigue_cycle_weight), value: Number(features.fatigue_cycle_score || 0) },
+    { key: "fatigue_cycle_score", label: "Energy Index", weight: Number(weights.fatigue_cycle_weight), value: Number(features.fatigue_cycle_risk ?? fatigueCycleRisk(features.fatigue_cycle_score)) },
     { key: "rest_risk", label: "Rest", weight: Number(weights.rest_weight), value: Number(features.rest_risk || 0) },
     { key: "load_risk", label: "Minutes", weight: Number(weights.load_weight), value: Number(features.load_risk || 0) },
     { key: "b2b_risk", label: "B2B", weight: Number(weights.b2b_weight), value: Number(features.b2b_risk || 0) },
