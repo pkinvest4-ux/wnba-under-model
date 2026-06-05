@@ -136,9 +136,19 @@ export function linesForPlayer(lineMap, player) {
 function eventMatchesGame(event, game) {
   const away = normalizeName(event.away_team || event.awayTeam || "");
   const home = normalizeName(event.home_team || event.homeTeam || "");
-  const gameAway = normalizeName(game.away_abbreviation || game.away_team || "");
-  const gameHome = normalizeName(game.home_abbreviation || game.home_team || "");
-  return Boolean(away && home && gameAway && gameHome && away.includes(gameAway) && home.includes(gameHome));
+  return teamMatches(away, game.away_team, game.away_abbreviation) && teamMatches(home, game.home_team, game.home_abbreviation);
+}
+
+function teamMatches(eventTeam, gameTeam, gameAbbreviation) {
+  const team = normalizeName(gameTeam || "");
+  const abbreviation = normalizeName(gameAbbreviation || "");
+  return Boolean(
+    eventTeam &&
+    (
+      (team && (eventTeam.includes(team) || team.includes(eventTeam))) ||
+      (abbreviation && (eventTeam === abbreviation || eventTeam.includes(abbreviation)))
+    )
+  );
 }
 
 async function oddsApiRequest(url) {
