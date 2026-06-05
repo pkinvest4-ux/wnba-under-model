@@ -1,12 +1,12 @@
 const STAT_KEYS = ["points", "rebounds", "assists", "pra"];
 const FIXED_WEIGHTS = {
-  intercept: -1.55,
-  fatigue_cycle_weight: 1.65,
+  intercept: -1.35,
+  fatigue_cycle_weight: 2.65,
   rest_weight: 0.95,
   load_weight: 0.7,
   b2b_weight: 0.55,
   opponent_weight: 0.45,
-  under_hit_rate_weight: 1.35
+  under_hit_rate_weight: 0.55
 };
 
 export function dateOnly(value) {
@@ -135,6 +135,9 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
     const line = realLine ?? estimatedLine;
     const lineGap = realLine == null ? null : Number((realLine - estimatedLine).toFixed(2));
     const lineMatchQuality = lineQuality(lineGap, realLine);
+    const snapshotRealLine = lineOverride?.snapshot_real_line == null ? realLine : Number(lineOverride.snapshot_real_line);
+    const snapshotLine = lineOverride?.snapshot_line == null ? line : Number(lineOverride.snapshot_line);
+    const snapshotLineGap = snapshotRealLine == null ? null : Number((snapshotRealLine - estimatedLine).toFixed(2));
     const under_hit_rate = underHitRate(sortedLogs, statType, line);
     const baseFeatures = {
       fatigue_cycle_score,
@@ -181,7 +184,13 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
       is_value_under: confidence_score > 65,
       line_source: lineOverride?.source || "generated",
       bookmaker: lineOverride?.bookmaker || null,
-      odds_price: lineOverride?.price ?? null
+      odds_price: lineOverride?.price ?? null,
+      snapshot_line: snapshotLine,
+      snapshot_real_line: snapshotRealLine,
+      snapshot_line_gap: snapshotLineGap,
+      snapshot_line_source: lineOverride?.snapshot_source || lineOverride?.source || "generated",
+      snapshot_bookmaker: lineOverride?.snapshot_bookmaker || lineOverride?.bookmaker || null,
+      snapshot_odds_price: lineOverride?.snapshot_price ?? lineOverride?.price ?? null
     };
   });
 }

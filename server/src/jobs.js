@@ -8,6 +8,7 @@ import {
   deletePicksForDate,
   getActivePlayers,
   getModelWeights,
+  getOpeningLineAnchors,
   getOpponentForPlayer,
   getPlayerByExternalId,
   getPlayerLogs,
@@ -167,7 +168,8 @@ export async function runDailyModel(date = isoDate()) {
   if (!games.length) return { date, games: 0, picks: 0, value_unders: 0 };
 
   const players = await getActivePlayers();
-  const lineMap = await fetchPropLinesForGames(games);
+  const lineMap = await fetchPropLinesForGames(gamesAcceptingMarketLines(games));
+  const openingLineAnchors = await getOpeningLineAnchors(date);
   const weightsByStat = config.modelLearningEnabled ? await getModelWeights() : {};
   await deletePicksForDate(date);
   let picksCount = 0;
@@ -180,7 +182,14 @@ export async function runDailyModel(date = isoDate()) {
     if (!matchup) continue;
 
     const logs = await getPlayerLogs(player.id);
-    const picks = buildPickFeatures(player, logs, date, matchup.opponent?.defensive_rating || 100, linesForPlayer(lineMap, player), weightsByStat);
+    const picks = buildPickFeatures(
+      player,
+      logs,
+      date,
+      matchup.opponent?.defensive_rating || 100,
+      applyOpeningLineAnchors(linesForPlayer(lineMap, player), openingLineAnchors.get(player.id) || {}),
+      weightsByStat
+    );
     modelCandidates += picks.length;
 
     const cardPicks = picks;
@@ -200,6 +209,31 @@ export async function runDailyModel(date = isoDate()) {
     real_line_only: false,
     real_line_usage: "tracking_and_market_grading"
   };
+}
+
+function gamesAcceptingMarketLines(games, now = new Date()) {
+  return games.filter((game) => !game.start_time || new Date(game.start_time).getTime() > now.getTime());
+}
+
+function applyOpeningLineAnchors(currentLines, openingLines) {
+  const anchored = { ...currentLines };
+  for (const [statType, opening] of Object.entries(openingLines)) {
+    const current = currentLines[statType];
+    const openingLine = Number(opening.real_line ?? opening.observed_line);
+    anchored[statType] = {
+      line: openingLine,
+      stat_type: statType,
+      source: opening.line_source || current?.source || "opening_line",
+      bookmaker: opening.bookmaker || current?.bookmaker || null,
+      price: opening.odds_price ?? current?.price ?? null,
+      snapshot_line: current?.line == null ? openingLine : Number(current.line),
+      snapshot_real_line: current?.line == null ? openingLine : Number(current.line),
+      snapshot_source: current?.source || opening.line_source || "opening_line",
+      snapshot_bookmaker: current?.bookmaker || opening.bookmaker || null,
+      snapshot_price: current?.price ?? opening.odds_price ?? null
+    };
+  }
+  return anchored;
 }
 
 export async function runPregameModelRefresh(now = new Date()) {

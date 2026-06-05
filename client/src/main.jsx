@@ -329,9 +329,9 @@ function buildTopRecommendations(picks, limit = 15) {
       const score =
         profile.projected_hit_rate * 100 +
         Number(pick.confidence_score || 0) * 4 +
-        Number(pick.under_hit_rate || 0) * 100 +
-        energyScore * 3 +
-        (pick.energy_index === "low" ? 120 : pick.energy_index === "medium" ? 35 : 0) +
+        Number(pick.under_hit_rate || 0) * 30 +
+        energyScore * 5 +
+        (pick.energy_index === "low" ? 180 : pick.energy_index === "medium" ? 70 : 0) +
         (isRealLine(pick) ? 90 : 0) +
         (pick.stat_type === "assists" ? 45 : 0) +
         (pick.bettable_status === "bettable" ? 60 : 0) -
@@ -599,7 +599,7 @@ function PickDetails({ pick, snapshots = [] }) {
         <DetailStat label="Closing Line" value={pick.closing_line ?? "pending"} />
         <DetailStat label="Closing Source" value={pick.closing_line_source ? filterLabel(sourceKey({ line_source: pick.closing_line_source })) : "pending"} />
         <DetailStat label="Odds Price" value={pick.odds_price ?? "n/a"} />
-        <DetailStat label="Under Hit Rate" value={formatPercent(pick.under_hit_rate)} />
+        <DetailStat label="Under History" value={formatPercent(pick.under_hit_rate)} />
         <DetailStat label="Recent Minutes" value={formatNumber(pick.recent_minutes_avg)} />
         <DetailStat label="Days Rest" value={pick.days_rest ?? "n/a"} />
         <DetailStat label="Back-to-Back" value={pick.back_to_back ? "Yes" : "No"} />

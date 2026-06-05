@@ -45,7 +45,7 @@ PORT=3000
 
 No paid API key is required for WNBA schedule, roster, boxscore, or result data when `DATA_PROVIDER=espn`.
 
-Real prop lines require a line source. Set `PROP_PROVIDER=all` and add free `PROPLINE_API_KEY` and/or `THE_ODDS_API_KEY` values. The app tries PropLine first, then The Odds API. The prediction board stores the full value-under signal universe, including rows that do not yet have a market line. Real sportsbook lines are used as market-tracking anchors so the system can grade whether the under signal beat an actual available number. A real line does not need to match the generated estimate; line fit is stored only as diagnostic data for later analysis.
+Real prop lines require a line source. Set `PROP_PROVIDER=all` and add free `PROPLINE_API_KEY` and/or `THE_ODDS_API_KEY` values. The app tries PropLine first, then The Odds API. The prediction board stores the full value-under signal universe, including rows that do not yet have a market line. Real sportsbook lines are used as market-tracking anchors so the system can grade whether the under signal beat an actual available number. The first real line observed for a player/stat/date is the anchored line for grading, while later refreshes are stored as line-movement snapshots. A real line does not need to match the generated estimate; line fit is stored only as diagnostic data for later analysis.
 
 ## Local Setup
 
@@ -162,7 +162,7 @@ The service runs on its own:
 
 - Startup automation refreshes rosters/logs, grades recent results, and generates current-day picks.
 - Startup automation keeps feature/outcome data ready for later analysis.
-- Model refreshes run at 10am, noon, 3pm, 5pm, 7pm, and 9pm ET to catch later prop-line availability. The model evaluates and stores all value-under candidates. Real-line picks are the market-tracked subset used to measure performance against sportsbook numbers, not the source of the prediction.
+- Model refreshes run at 10am, noon, 3pm, 5pm, 7pm, and 9pm ET to catch later prop-line availability. The model evaluates and stores all value-under candidates. Real-line picks are the market-tracked subset used to measure performance against sportsbook numbers, not the source of the prediction. Refreshes only pull prop lines for games that have not tipped yet, so live/in-game line movement does not rewrite the anchored bet line.
 - Pregame checks run every 15 minutes from 10am-11pm ET and refresh the full card around 75, 45, and 20 minutes before tip, up to `PREGAME_REFRESH_WINDOW_MINUTES`, so new real-line picks can be added if they start meeting criteria.
 - Result sync runs every 30 minutes from 10pm-5:59am ET, then hourly from 6am-2pm ET, so completed games keep getting retried until stats are available and picks settle.
 - The app also grades recent results on startup through `AUTO_BOOTSTRAP=true`, which helps after deploys or service restarts.

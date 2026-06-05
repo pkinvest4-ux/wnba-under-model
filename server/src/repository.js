@@ -158,6 +158,25 @@ export async function getOpponentForPlayer(player, games) {
   return { game, opponent: rows[0] };
 }
 
+export async function getOpeningLineAnchors(gameDate) {
+  const { rows } = await query(`
+    SELECT DISTINCT ON (player_id, stat_type)
+      player_id, stat_type, observed_line, estimated_line, real_line, line_gap,
+      line_source, bookmaker, odds_price, created_at
+    FROM line_snapshots
+    WHERE game_date = $1
+      AND real_line IS NOT NULL
+    ORDER BY player_id, stat_type, created_at ASC
+  `, [gameDate]);
+
+  const anchors = new Map();
+  for (const row of rows) {
+    if (!anchors.has(row.player_id)) anchors.set(row.player_id, {});
+    anchors.get(row.player_id)[row.stat_type] = row;
+  }
+  return anchors;
+}
+
 export async function savePicks(playerId, gameId, gameDate, picks) {
   await withClient(async (client) => {
     for (const pick of picks) {
@@ -252,13 +271,13 @@ export async function savePicks(playerId, gameId, gameDate, picks) {
           gameId,
           gameDate,
           pick.stat_type,
-          pick.line,
+          pick.snapshot_line ?? pick.line,
           pick.estimated_line ?? null,
-          pick.real_line ?? null,
-          pick.line_gap ?? null,
-          pick.line_source || "generated",
-          pick.bookmaker || null,
-          pick.odds_price ?? null,
+          pick.snapshot_real_line ?? pick.real_line ?? null,
+          pick.snapshot_line_gap ?? pick.line_gap ?? null,
+          pick.snapshot_line_source || pick.line_source || "generated",
+          pick.snapshot_bookmaker || pick.bookmaker || null,
+          pick.snapshot_odds_price ?? pick.odds_price ?? null,
           pick.confidence_score,
           pick.is_value_under
         ]
