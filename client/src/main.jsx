@@ -588,6 +588,7 @@ function PickDetails({ pick, snapshots = [] }) {
         <DetailStat label="Board Status" value={filterLabel(pick.bettable_status || "research")} />
         {pick.recommendation_profile && <DetailStat label="Projected Hit" value={`${pick.recommendation_profile.projected_hit_rate}%`} />}
         <DetailStat label="Energy Window" value={energyWindowLabel(pick.cycle_window)} />
+        <DetailStat label="Availability" value={pick.availability_tags?.length ? pick.availability_tags.join(", ") : "Clear"} />
         <DetailStat label="Closing Line" value={pick.closing_line ?? "pending"} />
         <DetailStat label="Closing Source" value={pick.closing_line_source ? filterLabel(sourceKey({ line_source: pick.closing_line_source })) : "pending"} />
         <DetailStat label="Odds Price" value={pick.odds_price ?? "n/a"} />
@@ -1158,6 +1159,9 @@ function downloadCsv(filename, picks) {
     "fatigue_cycle_confidence",
     "fatigue_cycle_sample_size",
     "cycle_window",
+    "availability_risk",
+    "availability_status",
+    "availability_tags",
     "model_version",
     "under_hit_rate",
     "recent_minutes_avg",

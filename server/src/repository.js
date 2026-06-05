@@ -201,13 +201,14 @@ export async function savePicks(playerId, gameId, gameDate, picks) {
         `INSERT INTO picks (
           player_id, game_id, game_date, stat_type, line, confidence_score, fatigue_cycle_score,
           fatigue_cycle_day, fatigue_cycle_offset, fatigue_cycle_confidence, fatigue_cycle_sample_size,
-          cycle_window, energy_band, opponent_def_rating, recent_minutes_avg, days_rest, back_to_back,
+          cycle_window, energy_band, opponent_def_rating, availability_risk, availability_status, availability_note, availability_tags,
+          recent_minutes_avg, days_rest, back_to_back,
           under_hit_rate, rest_risk, load_risk, opponent_risk, b2b_risk, model_version,
           reasons, factor_breakdown, formula_summary, line_source, bookmaker, odds_price,
           estimated_line, real_line, line_gap, line_match_quality, line_alerts,
           bettable_status, watchlist_reason, risk_tags, is_value_under
         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24::jsonb, $25::jsonb, $26, $27, $28, $29, $30, $31, $32, $33, $34::jsonb, $35, $36, $37::jsonb, $38)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::jsonb, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28::jsonb, $29::jsonb, $30, $31, $32, $33, $34, $35, $36, $37, $38::jsonb, $39, $40, $41::jsonb, $42)
          ON CONFLICT (player_id, game_date, stat_type, line) DO UPDATE SET
            game_id = EXCLUDED.game_id,
            confidence_score = EXCLUDED.confidence_score,
@@ -219,6 +220,10 @@ export async function savePicks(playerId, gameId, gameDate, picks) {
            cycle_window = EXCLUDED.cycle_window,
            energy_band = EXCLUDED.energy_band,
            opponent_def_rating = EXCLUDED.opponent_def_rating,
+           availability_risk = EXCLUDED.availability_risk,
+           availability_status = EXCLUDED.availability_status,
+           availability_note = EXCLUDED.availability_note,
+           availability_tags = EXCLUDED.availability_tags,
            recent_minutes_avg = EXCLUDED.recent_minutes_avg,
            days_rest = EXCLUDED.days_rest,
            back_to_back = EXCLUDED.back_to_back,
@@ -258,6 +263,10 @@ export async function savePicks(playerId, gameId, gameDate, picks) {
           pick.cycle_window || null,
           pick.energy_band,
           pick.opponent_def_rating,
+          pick.availability_risk ?? 0,
+          pick.availability_status || null,
+          pick.availability_note || null,
+          JSON.stringify(pick.availability_tags || []),
           pick.recent_minutes_avg,
           pick.days_rest,
           pick.back_to_back,

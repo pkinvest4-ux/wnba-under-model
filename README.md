@@ -41,12 +41,26 @@ MODEL_LEARNING_ENABLED=false
 MODEL_LEARNING_MIN_SAMPLES=1000
 REAL_LINE_PICKS_ONLY=false
 PREGAME_REFRESH_WINDOW_MINUTES=75
+AVAILABILITY_REPORT_JSON=[]
 PORT=3000
 ```
 
 No paid API key is required for WNBA schedule, roster, boxscore, or result data when `DATA_PROVIDER=espn`.
 
 Real prop lines require a line source. Set `PROP_PROVIDER=all` and add free `PROPLINE_API_KEY` and/or `THE_ODDS_API_KEY` values. The app tries PropLine first, then The Odds API. The prediction board stores the full value-under signal universe, including rows that do not yet have a market line. Real sportsbook lines are used as market-tracking anchors so the system can grade whether the under signal beat an actual available number. The first real line observed for a player/stat/date is the anchored line for grading, while later refreshes are stored as line-movement snapshots. A real line does not need to match the generated estimate; line fit is stored only as diagnostic data for later analysis.
+
+Public availability reports can be added through `AVAILABILITY_REPORT_JSON`. These are treated as underperformance-risk inputs, not medical-cycle labels.
+
+```json
+[
+  {
+    "date": "2026-06-05",
+    "player": "Example Player",
+    "status": "questionable",
+    "note": "illness"
+  }
+]
+```
 
 ## Local Setup
 
@@ -139,6 +153,7 @@ node server/scripts/backfillSeason.js 2025 2025-05-16 2025-10-10
 Each generated pick uses:
 
 - Internal rhythm score
+- Public availability-risk tags such as illness, questionable, undisclosed, or minutes limit
 - Days rest
 - 7-day rolling minutes average
 - Back-to-back flag

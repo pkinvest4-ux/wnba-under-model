@@ -93,6 +93,10 @@ export async function migrate() {
       cycle_window TEXT,
       energy_band TEXT NOT NULL,
       opponent_def_rating NUMERIC,
+      availability_risk NUMERIC,
+      availability_status TEXT,
+      availability_note TEXT,
+      availability_tags JSONB DEFAULT '[]'::jsonb,
       recent_minutes_avg NUMERIC,
       days_rest INTEGER,
       back_to_back BOOLEAN,
@@ -200,6 +204,10 @@ export async function migrate() {
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS load_risk NUMERIC;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS opponent_risk NUMERIC;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS b2b_risk NUMERIC;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS availability_risk NUMERIC;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS availability_status TEXT;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS availability_note TEXT;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS availability_tags JSONB DEFAULT '[]'::jsonb;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS model_version TEXT DEFAULT 'fixed_v1';
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS reasons JSONB DEFAULT '[]'::jsonb;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS factor_breakdown JSONB DEFAULT '[]'::jsonb;

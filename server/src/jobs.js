@@ -1,4 +1,5 @@
 import { config } from "./config.js";
+import { availabilityForPlayer, buildAvailabilityMap } from "./availability.js";
 import { fetchGamesByDate, fetchPlayers, fetchPlayerStats, fetchTeams } from "./balldontlie.js";
 import { fetchEspnGamesByDate, fetchEspnPlayerStatsByDate, fetchEspnPlayers, fetchEspnTeams } from "./espn.js";
 import { fetchPropLinesForGames, linesForPlayer } from "./propLines.js";
@@ -197,6 +198,7 @@ export async function runDailyModel(date = isoDate()) {
   const players = await getActivePlayers();
   const lineMap = await fetchPropLinesForGames(gamesAcceptingMarketLines(games));
   const openingLineAnchors = await getOpeningLineAnchors(date);
+  const availabilityMap = buildAvailabilityMap(date);
   const weightsByStat = config.modelLearningEnabled ? await getModelWeights() : {};
   await deletePicksForDate(date);
   let picksCount = 0;
@@ -215,7 +217,8 @@ export async function runDailyModel(date = isoDate()) {
       date,
       matchup.opponent?.defensive_rating || 100,
       applyOpeningLineAnchors(linesForPlayer(lineMap, player), openingLineAnchors.get(player.id) || {}),
-      weightsByStat
+      weightsByStat,
+      availabilityForPlayer(availabilityMap, player)
     );
     modelCandidates += picks.length;
 

@@ -8,6 +8,7 @@ const FIXED_WEIGHTS = {
   load_weight: 0.7,
   b2b_weight: 0.55,
   opponent_weight: 0.45,
+  availability_weight: 1.2,
   under_hit_rate_weight: 0.25
 };
 
@@ -129,7 +130,7 @@ export function rollingMinutes(logs, gameDate) {
   return Number((week.reduce((sum, log) => sum + Number(log.minutes || 0), 0) / week.length).toFixed(2));
 }
 
-export function scoreUnder({ fatigue_cycle_score, days_rest, recent_minutes_avg, back_to_back, opponent_def_rating, under_hit_rate }) {
+export function scoreUnder({ fatigue_cycle_score, days_rest, recent_minutes_avg, back_to_back, opponent_def_rating, under_hit_rate, availability_risk }) {
   const risks = normalizedRisks({ days_rest, recent_minutes_avg, back_to_back, opponent_def_rating });
   const personal = Number(under_hit_rate ?? 0.5);
   const cycleRisk = fatigueCycleRisk(fatigue_cycle_score);
@@ -141,6 +142,7 @@ export function scoreUnder({ fatigue_cycle_score, days_rest, recent_minutes_avg,
     FIXED_WEIGHTS.load_weight * risks.load_risk +
     FIXED_WEIGHTS.b2b_weight * risks.b2b_risk +
     FIXED_WEIGHTS.opponent_weight * risks.opponent_risk +
+    FIXED_WEIGHTS.availability_weight * Number(availability_risk || 0) +
     FIXED_WEIGHTS.under_hit_rate_weight * personal;
 
   return probabilityToScore(sigmoid(z));
@@ -158,6 +160,7 @@ export function scoreUnderWithWeights(features, weightsByStat, statType) {
     Number(weights.load_weight) * Number(features.load_risk || 0) +
     Number(weights.b2b_weight) * Number(features.b2b_risk || 0) +
     Number(weights.opponent_weight) * Number(features.opponent_risk || 0) +
+    FIXED_WEIGHTS.availability_weight * Number(features.availability_risk || 0) +
     Number(weights.under_hit_rate_weight) * Number(features.under_hit_rate || 0.5);
 
   return {
@@ -166,7 +169,7 @@ export function scoreUnderWithWeights(features, weightsByStat, statType) {
   };
 }
 
-export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lineOverrides = {}, weightsByStat = {}) {
+export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lineOverrides = {}, weightsByStat = {}, availabilityReport = {}) {
   const sortedLogs = logs
     .filter((log) => dateOnly(log.game_date) < dateOnly(gameDate))
     .sort((a, b) => dateOnly(b.game_date).localeCompare(dateOnly(a.game_date)));
@@ -200,6 +203,7 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
       recent_minutes_avg,
       back_to_back,
       opponent_def_rating: opponentDefRating,
+      availability_risk: Number(availabilityReport.availability_risk || 0),
       under_hit_rate
     };
     const risks = normalizedRisks(baseFeatures);
@@ -233,6 +237,10 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
       recent_minutes_avg,
       days_rest: daysRest,
       back_to_back,
+      availability_risk: Number(availabilityReport.availability_risk || 0),
+      availability_status: availabilityReport.availability_status || null,
+      availability_note: availabilityReport.availability_note || null,
+      availability_tags: availabilityReport.availability_tags || [],
       under_hit_rate,
       ...risks,
       model_version,
@@ -297,6 +305,7 @@ function riskTags({ confidence_score, sortedLogs, allFeatures, lineMatchQuality,
   if (Number(allFeatures.recent_minutes_avg || 0) >= 30) tags.push("Heavy minutes");
   if (Number(allFeatures.days_rest) <= 1) tags.push("Short rest");
   if (allFeatures.back_to_back) tags.push("B2B");
+  for (const tag of allFeatures.availability_tags || []) tags.push(tag);
   return [...new Set(tags)].slice(0, 8);
 }
 
@@ -311,6 +320,9 @@ export function pickReasons(features, breakdown = []) {
   }
   if (Number(features.recent_minutes_avg || 0) >= 30) {
     reasons.push({ label: "Heavy minutes", score: features.load_risk });
+  }
+  if (Number(features.availability_risk || 0) >= 0.55) {
+    reasons.push({ label: "Availability watch", score: 1.1 + Number(features.availability_risk || 0) });
   }
   if (Number(features.fatigue_cycle_score || 0) >= 0.58) {
     reasons.push({ label: "Low Energy Index", score: 1.2 + Number(features.fatigue_cycle_score || 0) });
@@ -340,6 +352,7 @@ export function factorBreakdown(features, learnedWeights) {
     { key: "load_risk", label: "Minutes", weight: Number(weights.load_weight), value: Number(features.load_risk || 0) },
     { key: "b2b_risk", label: "B2B", weight: Number(weights.b2b_weight), value: Number(features.b2b_risk || 0) },
     { key: "opponent_risk", label: "Matchup", weight: Number(weights.opponent_weight), value: Number(features.opponent_risk || 0) },
+    { key: "availability_risk", label: "Availability", weight: Number(weights.availability_weight ?? FIXED_WEIGHTS.availability_weight), value: Number(features.availability_risk || 0) },
     { key: "under_hit_rate", label: "Under history", weight: Number(weights.under_hit_rate_weight), value: Number(features.under_hit_rate || 0.5) }
   ].map((factor) => ({
     ...factor,
