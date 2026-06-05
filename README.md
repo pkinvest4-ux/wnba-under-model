@@ -116,6 +116,24 @@ Manually runs the daily model for the supplied date or today's ET date.
 { "date": "2026-06-02" }
 ```
 
+### `POST /admin/backfill-season-logs`
+
+Backfills historical ESPN box-score logs for individualized performance-cycle offset calibration. Current roster/team mappings are preserved while older game logs are imported.
+
+```json
+{
+  "season": 2025,
+  "start_date": "2025-05-16",
+  "end_date": "2025-10-10"
+}
+```
+
+Local script equivalent:
+
+```bash
+node server/scripts/backfillSeason.js 2025 2025-05-16 2025-10-10
+```
+
 ## Model Inputs
 
 Each generated pick uses:

@@ -133,6 +133,23 @@ export async function getPlayerLogs(playerId) {
   return rows;
 }
 
+export async function updatePlayerFirstTrackedDatesFromLogs() {
+  const { rows } = await query(`
+    WITH first_logs AS (
+      SELECT player_id, MIN(game_date) AS first_game_date
+      FROM player_game_logs
+      GROUP BY player_id
+    )
+    UPDATE players
+    SET first_tracked_game_date = first_logs.first_game_date
+    FROM first_logs
+    WHERE players.id = first_logs.player_id
+      AND (players.first_tracked_game_date IS NULL OR players.first_tracked_game_date > first_logs.first_game_date)
+    RETURNING players.id, players.first_name, players.last_name, players.first_tracked_game_date
+  `);
+  return rows;
+}
+
 export async function getTodayGames(date) {
   const { rows } = await query(`
     SELECT

@@ -17,6 +17,7 @@ import {
   markResults,
   picksForDate,
   savePicks,
+  updatePlayerFirstTrackedDatesFromLogs,
   upsertGame,
   upsertPlayer,
   upsertTeam,
@@ -42,6 +43,12 @@ export function addDays(dateString, days) {
   const date = new Date(`${dateString}T12:00:00Z`);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
+}
+
+export function daysBetween(startDate, endDate) {
+  const start = new Date(`${startDate}T12:00:00Z`);
+  const end = new Date(`${endDate}T12:00:00Z`);
+  return Math.max(0, Math.round((end - start) / 86400000));
 }
 
 export async function syncReferenceData() {
@@ -76,6 +83,26 @@ export async function syncSeasonGameLogs(season = config.season) {
   const stats = config.dataProvider === "balldontlie"
     ? await fetchPlayerStats({ season })
     : await fetchRecentEspnStats(season, 60);
+  return syncGameLogRows(stats, season);
+}
+
+export async function syncSeasonGameLogsRange({ season = config.season, startDate, endDate, preserveCurrentTeams = true }) {
+  if (!startDate || !endDate) throw new Error("startDate and endDate are required");
+  if (config.dataProvider !== "espn") throw new Error("Historical date-range backfill currently uses ESPN data");
+
+  const stats = [];
+  for (let offset = 0; offset <= daysBetween(startDate, endDate); offset += 1) {
+    const date = addDays(startDate, offset);
+    stats.push(...await fetchEspnPlayerStatsByDate(date, season));
+  }
+
+  const result = await syncGameLogRows(stats, season, { preserveCurrentTeams });
+  const firstTracked = await updatePlayerFirstTrackedDatesFromLogs();
+  return { ...result, date_range: { startDate, endDate }, first_tracked_updates: firstTracked.length };
+}
+
+async function syncGameLogRows(stats, season, options = {}) {
+  const preserveCurrentTeams = Boolean(options.preserveCurrentTeams);
   let logs = 0;
 
   for (const row of stats) {
@@ -96,7 +123,7 @@ export async function syncSeasonGameLogs(season = config.season) {
       first_name: row.player.first_name,
       last_name: row.player.last_name,
       position: row.player.position_abbreviation || row.player.position,
-      team_external_id: row.team ? String(row.team.id) : null,
+      team_external_id: preserveCurrentTeams ? null : row.team ? String(row.team.id) : null,
       first_tracked_game_date: (row.game.date || config.seasonStartDate).slice(0, 10),
       roster_status: "roster",
       last_known_starter: Boolean(row.player.starter)

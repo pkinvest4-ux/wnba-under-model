@@ -6,7 +6,7 @@ import cron from "node-cron";
 import { z } from "zod";
 import { config } from "./config.js";
 import { migrate } from "./db.js";
-import { bootstrapAutomation, isoDate, reconcileRecentResults, reconcileResultsForDate, runDailyModel, runPregameModelRefresh } from "./jobs.js";
+import { bootstrapAutomation, isoDate, reconcileRecentResults, reconcileResultsForDate, runDailyModel, runPregameModelRefresh, syncSeasonGameLogsRange } from "./jobs.js";
 import { dateOnly } from "./model.js";
 import { lineSnapshotsForPick, markResults, pickHistory, picksForDate, playerTrend, setTrackedBet } from "./repository.js";
 
@@ -156,6 +156,20 @@ app.post("/admin/run-pregame-refresh", async (_req, res, next) => {
   try {
     const result = await runPregameModelRefresh();
     res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/admin/backfill-season-logs", async (req, res, next) => {
+  try {
+    const result = await syncSeasonGameLogsRange({
+      season: Number(req.body?.season || config.season - 1),
+      startDate: req.body?.start_date,
+      endDate: req.body?.end_date,
+      preserveCurrentTeams: req.body?.preserve_current_teams !== false
+    });
+    res.json({ ok: true, result });
   } catch (error) {
     next(error);
   }
