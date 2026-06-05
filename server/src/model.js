@@ -1,4 +1,6 @@
 const STAT_KEYS = ["points", "rebounds", "assists", "pra"];
+const CYCLE_PERIOD_DAYS = 28;
+const LOW_OUTPUT_PEAK_DAY = 21;
 const FIXED_WEIGHTS = {
   intercept: -1.35,
   fatigue_cycle_weight: 2.65,
@@ -16,7 +18,7 @@ export function dateOnly(value) {
 
 export function fatigueCycleScore(firstTrackedGameDate, gameDate) {
   const days = fatigueCycleDay(firstTrackedGameDate, gameDate);
-  return Number(((Math.sin((2 * Math.PI * days) / 28 - Math.PI / 2) + 1) / 2).toFixed(4));
+  return cycleScoreFromDay(days);
 }
 
 export function fatigueCycleRisk(score) {
@@ -28,7 +30,37 @@ export function fatigueCycleDay(firstTrackedGameDate, gameDate) {
   const start = new Date(`${dateOnly(firstTrackedGameDate)}T12:00:00Z`);
   const game = new Date(`${dateOnly(gameDate)}T12:00:00Z`);
   const days = Math.max(0, Math.round((game - start) / 86400000));
-  return days % 28;
+  return days % CYCLE_PERIOD_DAYS;
+}
+
+export function cycleScoreFromDay(day) {
+  return Number(((Math.cos((2 * Math.PI * (Number(day || 0) - LOW_OUTPUT_PEAK_DAY)) / CYCLE_PERIOD_DAYS) + 1) / 2).toFixed(4));
+}
+
+export function inferFatigueCycleOffset(logs = [], firstTrackedGameDate = null) {
+  const sample = logs.filter((log) => Number(log.minutes || 0) >= 8);
+  if (sample.length < 6) return 0;
+  const anchorDate = firstTrackedGameDate || sample[sample.length - 1]?.game_date;
+
+  const values = sample.map((log) => statValue(log, "pra"));
+  const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const variance = values.reduce((sum, value) => sum + (value - average) ** 2, 0) / values.length;
+  const deviation = Math.sqrt(variance) || 1;
+
+  let bestOffset = 0;
+  let bestScore = -Infinity;
+  for (let offset = 0; offset < CYCLE_PERIOD_DAYS; offset += 1) {
+    const score = sample.reduce((total, log, index) => {
+      const baseDay = fatigueCycleDay(anchorDate || log.game_date, log.game_date);
+      const downMagnitude = Math.max(0, (average - values[index]) / deviation);
+      return total + cycleScoreFromDay((baseDay + offset) % CYCLE_PERIOD_DAYS) * downMagnitude;
+    }, 0);
+    if (score > bestScore) {
+      bestScore = score;
+      bestOffset = offset;
+    }
+  }
+  return bestOffset;
 }
 
 export function energyBand(score) {
@@ -130,8 +162,10 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
   const daysRest = previous
     ? Math.max(0, Math.round((new Date(`${dateOnly(gameDate)}T12:00:00Z`) - new Date(`${dateOnly(previous.game_date)}T12:00:00Z`)) / 86400000) - 1)
     : 3;
-  const fatigue_cycle_day = fatigueCycleDay(player.first_tracked_game_date || gameDate, gameDate);
-  const fatigue_cycle_score = fatigueCycleScore(player.first_tracked_game_date || gameDate, gameDate);
+  const fatigue_cycle_offset = inferFatigueCycleOffset(sortedLogs, player.first_tracked_game_date || gameDate);
+  const baseCycleDay = fatigueCycleDay(player.first_tracked_game_date || gameDate, gameDate);
+  const fatigue_cycle_day = (baseCycleDay + fatigue_cycle_offset) % CYCLE_PERIOD_DAYS;
+  const fatigue_cycle_score = cycleScoreFromDay(fatigue_cycle_day);
   const recent_minutes_avg = rollingMinutes(sortedLogs, gameDate);
   const back_to_back = daysRest === 0;
 
