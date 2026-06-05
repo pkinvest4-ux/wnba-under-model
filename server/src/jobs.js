@@ -183,7 +183,7 @@ export async function runDailyModel(date = isoDate()) {
     const picks = buildPickFeatures(player, logs, date, matchup.opponent?.defensive_rating || 100, linesForPlayer(lineMap, player), weightsByStat);
     modelCandidates += picks.length;
 
-    const cardPicks = config.realLinePicksOnly ? picks.filter((pick) => pick.real_line != null) : picks;
+    const cardPicks = picks;
     await savePicks(player.id, matchup.game.id, date, cardPicks);
     picksCount += cardPicks.length;
     realLinePicks += cardPicks.filter((pick) => pick.real_line != null).length;
@@ -197,7 +197,8 @@ export async function runDailyModel(date = isoDate()) {
     value_unders: valueCount,
     real_line_picks: realLinePicks,
     model_candidates: modelCandidates,
-    real_line_only: config.realLinePicksOnly
+    real_line_only: false,
+    real_line_usage: "tracking_and_market_grading"
   };
 }
 

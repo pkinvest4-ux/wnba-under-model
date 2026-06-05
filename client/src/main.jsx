@@ -152,7 +152,7 @@ function App() {
         <div>
           <p className="sectionLabel">Current Card</p>
           <h2>{todayPicks.length} value unders</h2>
-          <span>{highConfidenceCount} at 80+ confidence · {realLineCount} real prop lines · {todayPicks.length - realLineCount} model-estimated lines</span>
+          <span>{highConfidenceCount} at 80+ confidence · {realLineCount} market-tracked lines · {todayPicks.length - realLineCount} signal-only rows</span>
         </div>
         {topPick ? (
           <div className="spotlight">
@@ -273,7 +273,7 @@ function FinancialAnalytics({ analytics, summary }) {
         <InsightCard label="Best Player" value={analytics.topPlayers[0]?.name || "n/a"} detail={analytics.topPlayers[0] ? `${formatCurrency(analytics.topPlayers[0].profitDollars)} · ${analytics.topPlayers[0].record}` : "No graded players yet"} tone="positive" />
         <InsightCard label="Tracked Bets" value={formatCurrency(analytics.tracked.profitDollars)} detail={`${analytics.tracked.record} · ${analytics.tracked.graded} graded`} tone={analytics.tracked.profitDollars >= 0 ? "positive" : "negative"} />
         <InsightCard label="Real-Line Picks" value={`${analytics.marketOnly.hitRate}%`} detail={`${analytics.marketOnly.record} · ${formatCurrency(analytics.marketOnly.profitDollars)}`} tone={analytics.marketOnly.profitDollars >= 0 ? "positive" : "negative"} />
-        <InsightCard label="Bettable Slice" value={`${analytics.bettableOnly.hitRate}%`} detail={`${analytics.bettableOnly.record} · ${formatCurrency(analytics.bettableOnly.profitDollars)}`} tone={analytics.bettableOnly.profitDollars >= 0 ? "positive" : "negative"} />
+        <InsightCard label="Market-Tracked Slice" value={`${analytics.bettableOnly.hitRate}%`} detail={`${analytics.bettableOnly.record} · ${formatCurrency(analytics.bettableOnly.profitDollars)}`} tone={analytics.bettableOnly.profitDollars >= 0 ? "positive" : "negative"} />
       </div>
 
       <div className="analyticsGrid">
@@ -322,7 +322,7 @@ function FinancialAnalytics({ analytics, summary }) {
 
 function buildTopRecommendations(picks, limit = 15) {
   return (picks || [])
-    .filter((pick) => isRealLine(pick) && pick.is_value_under !== false)
+    .filter((pick) => pick.is_value_under !== false)
     .map((pick) => {
       const profile = recommendationProfile(pick);
       const energyScore = energyContributionPercent(pick);
@@ -332,6 +332,7 @@ function buildTopRecommendations(picks, limit = 15) {
         Number(pick.under_hit_rate || 0) * 100 +
         energyScore * 3 +
         (pick.energy_index === "low" ? 120 : pick.energy_index === "medium" ? 35 : 0) +
+        (isRealLine(pick) ? 90 : 0) +
         (pick.stat_type === "assists" ? 45 : 0) +
         (pick.bettable_status === "bettable" ? 60 : 0) -
         (hasRiskTag(pick, "Low sample") ? 250 : 0) -
