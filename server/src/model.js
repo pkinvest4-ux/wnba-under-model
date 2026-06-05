@@ -297,7 +297,6 @@ function riskTags({ confidence_score, sortedLogs, allFeatures, lineMatchQuality,
   if (Number(allFeatures.recent_minutes_avg || 0) >= 30) tags.push("Heavy minutes");
   if (Number(allFeatures.days_rest) <= 1) tags.push("Short rest");
   if (allFeatures.back_to_back) tags.push("B2B");
-  if (Number(allFeatures.under_hit_rate || 0) >= 0.7) tags.push("Strong under history");
   return [...new Set(tags)].slice(0, 8);
 }
 
@@ -313,11 +312,8 @@ export function pickReasons(features, breakdown = []) {
   if (Number(features.recent_minutes_avg || 0) >= 30) {
     reasons.push({ label: "Heavy minutes", score: features.load_risk });
   }
-  if (Number(features.under_hit_rate || 0) >= 0.62) {
-    reasons.push({ label: `${Math.round(Number(features.under_hit_rate) * 100)}% under rate`, score: features.under_hit_rate });
-  }
   if (Number(features.fatigue_cycle_score || 0) >= 0.58) {
-    reasons.push({ label: "Low Energy Index", score: features.fatigue_cycle_score });
+    reasons.push({ label: "Low Energy Index", score: 1.2 + Number(features.fatigue_cycle_score || 0) });
   }
   if (Number(features.opponent_def_rating || 100) >= 101) {
     reasons.push({ label: "Tough matchup", score: features.opponent_risk });
@@ -327,7 +323,7 @@ export function pickReasons(features, breakdown = []) {
   }
 
   const formulaReasons = breakdown
-    .filter((item) => item.percent >= 12)
+    .filter((item) => item.percent >= 12 && item.label !== "Under history")
     .map((item) => ({ label: `${item.label} ${item.percent}%`, score: item.percent / 100 }));
 
   return [...formulaReasons, ...reasons]

@@ -329,7 +329,6 @@ function buildTopRecommendations(picks, limit = 15) {
       const score =
         profile.projected_hit_rate * 100 +
         Number(pick.confidence_score || 0) * 4 +
-        Number(pick.under_hit_rate || 0) * 30 +
         energyScore * 5 +
         (pick.energy_index === "low" ? 180 : pick.energy_index === "medium" ? 70 : 0) +
         (isRealLine(pick) ? 90 : 0) +
@@ -363,9 +362,8 @@ function recommendationProfile(pick) {
   const assists = pick.stat_type === "assists";
   const points = pick.stat_type === "points";
   const rebounds = pick.stat_type === "rebounds";
-  const b2bOrHistory = hasRiskTag(pick, "B2B") || hasRiskTag(pick, "Strong under history");
+  const b2b = hasRiskTag(pick, "B2B");
   const confidence = Number(pick.confidence_score || 0);
-  const underRate = Number(pick.under_hit_rate || 0);
   const lowerRebound = rebounds && Number(pick.line || 0) <= 6.5;
   const lowEnergy = pick.energy_index === "low" || pick.cycle_window === "low_output_window";
   const energyContribution = energyContributionPercent(pick);
@@ -373,8 +371,8 @@ function recommendationProfile(pick) {
   if (lowEnergy && confidence >= 80 && clean) {
     return { projected_hit_rate: 86, label: "Real-line Energy profile" };
   }
-  if (assists && b2bOrHistory && clean) {
-    return { projected_hit_rate: 84, label: "Elite assists under profile" };
+  if (assists && b2b && clean) {
+    return { projected_hit_rate: 82, label: "Energy plus B2B profile" };
   }
   if (energyContribution >= 25 && confidence >= 75 && clean) {
     return { projected_hit_rate: 76, label: "Energy-led under profile" };
@@ -382,17 +380,11 @@ function recommendationProfile(pick) {
   if (assists && confidence >= 80 && clean) {
     return { projected_hit_rate: 72, label: "High-confidence assists profile" };
   }
-  if (confidence >= 80 && underRate >= 0.6 && pick.stat_type !== "pra" && clean) {
-    return { projected_hit_rate: 70, label: "Premium high-confidence profile" };
-  }
   if (confidence >= 80 && pick.stat_type !== "pra" && (assists || points || lowerRebound) && clean) {
     return { projected_hit_rate: 68, label: "Premium no-PRA profile" };
   }
   if (confidence >= 85 && (assists || points || lowerRebound) && clean) {
     return { projected_hit_rate: 67, label: "Strong confidence profile" };
-  }
-  if (underRate >= 0.7 && confidence >= 80 && clean) {
-    return { projected_hit_rate: 66, label: "Strong under-history profile" };
   }
   if (confidence >= 80 && clean) {
     return { projected_hit_rate: 64, label: "High-confidence research profile" };
@@ -599,7 +591,6 @@ function PickDetails({ pick, snapshots = [] }) {
         <DetailStat label="Closing Line" value={pick.closing_line ?? "pending"} />
         <DetailStat label="Closing Source" value={pick.closing_line_source ? filterLabel(sourceKey({ line_source: pick.closing_line_source })) : "pending"} />
         <DetailStat label="Odds Price" value={pick.odds_price ?? "n/a"} />
-        <DetailStat label="Under History" value={formatPercent(pick.under_hit_rate)} />
         <DetailStat label="Recent Minutes" value={formatNumber(pick.recent_minutes_avg)} />
         <DetailStat label="Days Rest" value={pick.days_rest ?? "n/a"} />
         <DetailStat label="Back-to-Back" value={pick.back_to_back ? "Yes" : "No"} />
