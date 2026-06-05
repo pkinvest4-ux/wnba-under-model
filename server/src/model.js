@@ -38,8 +38,12 @@ export function cycleScoreFromDay(day) {
 }
 
 export function inferFatigueCycleOffset(logs = [], firstTrackedGameDate = null) {
+  return inferFatigueCycleProfile(logs, firstTrackedGameDate).offset;
+}
+
+export function inferFatigueCycleProfile(logs = [], firstTrackedGameDate = null) {
   const sample = logs.filter((log) => Number(log.minutes || 0) >= 8);
-  if (sample.length < 6) return 0;
+  if (sample.length < 6) return { offset: 0, confidence: 0, sample_size: sample.length };
   const anchorDate = firstTrackedGameDate || sample[sample.length - 1]?.game_date;
 
   const values = sample.map((log) => statValue(log, "pra"));
@@ -49,18 +53,26 @@ export function inferFatigueCycleOffset(logs = [], firstTrackedGameDate = null) 
 
   let bestOffset = 0;
   let bestScore = -Infinity;
+  const scores = [];
   for (let offset = 0; offset < CYCLE_PERIOD_DAYS; offset += 1) {
     const score = sample.reduce((total, log, index) => {
       const baseDay = fatigueCycleDay(anchorDate || log.game_date, log.game_date);
       const downMagnitude = Math.max(0, (average - values[index]) / deviation);
       return total + cycleScoreFromDay((baseDay + offset) % CYCLE_PERIOD_DAYS) * downMagnitude;
     }, 0);
+    scores.push(score);
     if (score > bestScore) {
       bestScore = score;
       bestOffset = offset;
     }
   }
-  return bestOffset;
+  const averageScore = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+  const confidence = Math.max(0, Math.min(1, (bestScore - averageScore) / (sample.length || 1)));
+  return {
+    offset: bestOffset,
+    confidence: Number(confidence.toFixed(4)),
+    sample_size: sample.length
+  };
 }
 
 export function energyBand(score) {
@@ -162,7 +174,8 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
   const daysRest = previous
     ? Math.max(0, Math.round((new Date(`${dateOnly(gameDate)}T12:00:00Z`) - new Date(`${dateOnly(previous.game_date)}T12:00:00Z`)) / 86400000) - 1)
     : 3;
-  const fatigue_cycle_offset = inferFatigueCycleOffset(sortedLogs, player.first_tracked_game_date || gameDate);
+  const fatigueCycleProfile = inferFatigueCycleProfile(sortedLogs, player.first_tracked_game_date || gameDate);
+  const fatigue_cycle_offset = fatigueCycleProfile.offset;
   const baseCycleDay = fatigueCycleDay(player.first_tracked_game_date || gameDate, gameDate);
   const fatigue_cycle_day = (baseCycleDay + fatigue_cycle_offset) % CYCLE_PERIOD_DAYS;
   const fatigue_cycle_score = cycleScoreFromDay(fatigue_cycle_day);
@@ -211,6 +224,9 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
       confidence_score,
       fatigue_cycle_score,
       fatigue_cycle_day,
+      fatigue_cycle_offset,
+      fatigue_cycle_confidence: fatigueCycleProfile.confidence,
+      fatigue_cycle_sample_size: fatigueCycleProfile.sample_size,
       cycle_window: cycleWindow(fatigue_cycle_score),
       energy_band: energyBand(fatigue_cycle_score),
       opponent_def_rating: opponentDefRating,

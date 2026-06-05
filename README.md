@@ -3,7 +3,7 @@
 A full-stack WNBA player performance under model for Railway. It tracks player game-log patterns for points, rebounds, assists, and PRA, writes daily value-under picks to PostgreSQL, and serves a clean React dashboard.
 
 The UI shows the model's rhythm feature as `Energy Index`; the underlying calculation is intentionally not described in product copy.
-The internal `fatigue_cycle_score` is an inferred performance-cycle feature only. It does not store, confirm, or expose player medical information. High-medium scores are treated as a possible down-game shoulder window so the model can catch one-off underperformance setups before the absolute cycle peak.
+The internal `fatigue_cycle_score` is an inferred performance-cycle feature only. It does not store, confirm, or expose player medical information. Each player gets an individualized performance-cycle offset inferred from her own historical down-game patterns; the model stores the inferred offset, confidence, and sample size so the signal can be audited later. High-medium scores are treated as a possible down-game shoulder window so the model can catch one-off underperformance setups before the absolute cycle peak.
 
 ## Stack
 

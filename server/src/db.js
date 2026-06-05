@@ -87,6 +87,9 @@ export async function migrate() {
       confidence_score INTEGER NOT NULL,
       fatigue_cycle_score NUMERIC NOT NULL,
       fatigue_cycle_day INTEGER,
+      fatigue_cycle_offset INTEGER,
+      fatigue_cycle_confidence NUMERIC,
+      fatigue_cycle_sample_size INTEGER,
       cycle_window TEXT,
       energy_band TEXT NOT NULL,
       opponent_def_rating NUMERIC,
@@ -176,6 +179,9 @@ export async function migrate() {
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS line_match_quality TEXT DEFAULT 'model_only';
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS line_alerts JSONB DEFAULT '[]'::jsonb;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS fatigue_cycle_day INTEGER;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS fatigue_cycle_offset INTEGER;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS fatigue_cycle_confidence NUMERIC;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS fatigue_cycle_sample_size INTEGER;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS cycle_window TEXT;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS closing_line NUMERIC;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS closing_real_line NUMERIC;
