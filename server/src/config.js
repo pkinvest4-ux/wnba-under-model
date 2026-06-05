@@ -23,6 +23,7 @@ export const config = {
   assumedJuice: Number(process.env.ASSUMED_JUICE || -115),
   modelLearningEnabled: process.env.MODEL_LEARNING_ENABLED === "true",
   modelLearningMinSamples: Number(process.env.MODEL_LEARNING_MIN_SAMPLES || 1000),
+  realLinePicksOnly: process.env.REAL_LINE_PICKS_ONLY !== "false",
   pregameRefreshWindowMinutes: Number(process.env.PREGAME_REFRESH_WINDOW_MINUTES || 75),
   clientDistPath: process.env.CLIENT_DIST_PATH || new URL("../../client/dist", import.meta.url).pathname
 };

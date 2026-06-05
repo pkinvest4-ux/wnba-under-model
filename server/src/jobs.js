@@ -172,6 +172,8 @@ export async function runDailyModel(date = isoDate()) {
   await deletePicksForDate(date);
   let picksCount = 0;
   let valueCount = 0;
+  let modelCandidates = 0;
+  let realLinePicks = 0;
 
   for (const player of players) {
     const matchup = await getOpponentForPlayer(player, games);
@@ -179,12 +181,24 @@ export async function runDailyModel(date = isoDate()) {
 
     const logs = await getPlayerLogs(player.id);
     const picks = buildPickFeatures(player, logs, date, matchup.opponent?.defensive_rating || 100, linesForPlayer(lineMap, player), weightsByStat);
-    await savePicks(player.id, matchup.game.id, date, picks);
-    picksCount += picks.length;
-    valueCount += picks.filter((pick) => pick.is_value_under).length;
+    modelCandidates += picks.length;
+
+    const cardPicks = config.realLinePicksOnly ? picks.filter((pick) => pick.real_line != null) : picks;
+    await savePicks(player.id, matchup.game.id, date, cardPicks);
+    picksCount += cardPicks.length;
+    realLinePicks += cardPicks.filter((pick) => pick.real_line != null).length;
+    valueCount += cardPicks.filter((pick) => pick.is_value_under).length;
   }
 
-  return { date, games: games.length, picks: picksCount, value_unders: valueCount };
+  return {
+    date,
+    games: games.length,
+    picks: picksCount,
+    value_unders: valueCount,
+    real_line_picks: realLinePicks,
+    model_candidates: modelCandidates,
+    real_line_only: config.realLinePicksOnly
+  };
 }
 
 export async function runPregameModelRefresh(now = new Date()) {

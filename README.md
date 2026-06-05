@@ -38,13 +38,14 @@ UNIT_SIZE_DOLLARS=10
 ASSUMED_JUICE=-115
 MODEL_LEARNING_ENABLED=false
 MODEL_LEARNING_MIN_SAMPLES=1000
+REAL_LINE_PICKS_ONLY=true
 PREGAME_REFRESH_WINDOW_MINUTES=75
 PORT=3000
 ```
 
 No paid API key is required for WNBA schedule, roster, boxscore, or result data when `DATA_PROVIDER=espn`.
 
-Real prop lines require a line source. Set `PROP_PROVIDER=all` and add free `PROPLINE_API_KEY` and/or `THE_ODDS_API_KEY` values. The app tries PropLine first, then The Odds API, and falls back to generated model lines for missing player/stat lines. Without prop-line keys, the app still runs automatically using generated model lines and marks those picks with source `Model`.
+Real prop lines require a line source. Set `PROP_PROVIDER=all` and add free `PROPLINE_API_KEY` and/or `THE_ODDS_API_KEY` values. The app tries PropLine first, then The Odds API. With `REAL_LINE_PICKS_ONLY=true`, the main betting card only stores/display picks that have actual real lines; model-only candidates are evaluated internally but not treated as betting picks. Set `REAL_LINE_PICKS_ONLY=false` only if you want to run broad research cards with generated model lines.
 
 ## Local Setup
 
@@ -161,7 +162,7 @@ The service runs on its own:
 
 - Startup automation refreshes rosters/logs, grades recent results, and generates current-day picks.
 - Startup automation keeps feature/outcome data ready for later analysis.
-- Model refreshes run at 10am, noon, 3pm, 5pm, 7pm, and 9pm ET to catch later prop-line availability.
+- Model refreshes run at 10am, noon, 3pm, 5pm, 7pm, and 9pm ET to catch later prop-line availability. The model evaluates all candidates, but with `REAL_LINE_PICKS_ONLY=true`, only real-line picks are saved to the betting card.
 - Pregame checks run every 15 minutes from 10am-11pm ET and refresh the full card around 75, 45, and 20 minutes before tip, up to `PREGAME_REFRESH_WINDOW_MINUTES`, so new real-line picks can be added if they start meeting criteria.
 - Result sync runs every 30 minutes from 10pm-5:59am ET, then hourly from 6am-2pm ET, so completed games keep getting retried until stats are available and picks settle.
 - The app also grades recent results on startup through `AUTO_BOOTSTRAP=true`, which helps after deploys or service restarts.
