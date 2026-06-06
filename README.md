@@ -30,7 +30,11 @@ THE_ODDS_API_SPORT_KEY=basketball_wnba
 THE_ODDS_API_REGIONS=us
 SHARP_API_KEY=
 SHARP_API_LEAGUE=wnba
+SHARP_API_SPORTBOOKS=draftkings,fanduel
 SHARP_API_LIMIT=200
+SHARP_API_MAX_PAGES=2
+SHARP_API_CACHE_TTL_MS=60000
+SHARP_API_RESERVE_REQUESTS=2
 BALLDONTLIE_API_KEY=
 BALLDONTLIE_BASE_URL=https://api.balldontlie.io/wnba/v1
 WNBA_SEASON=2026
@@ -51,7 +55,7 @@ PORT=3000
 
 No paid API key is required for WNBA schedule, roster, boxscore, or result data when `DATA_PROVIDER=espn`.
 
-Real prop lines require a line source. Set `PROP_PROVIDER=all` and add free `PROPLINE_API_KEY`, `THE_ODDS_API_KEY`, and/or `SHARP_API_KEY` values. The app tries PropLine first, then The Odds API, then SharpAPI to fill remaining gaps. The prediction board stores the full value-under signal universe, including rows that do not yet have a market line. Real sportsbook lines are used as market-tracking anchors so the system can grade whether the under signal beat an actual available number. The first real line observed for a player/stat/date is the anchored line for grading, while later refreshes are stored as line-movement snapshots. A real line does not need to match the generated estimate; line fit is stored only as diagnostic data for later analysis.
+Real prop lines require a line source. Set `PROP_PROVIDER=all` and add free `PROPLINE_API_KEY`, `THE_ODDS_API_KEY`, and/or `SHARP_API_KEY` values. The app tries PropLine first, then The Odds API, then SharpAPI to fill remaining gaps. SharpAPI requests are intentionally narrow: pregame only, DraftKings/FanDuel by default, and only points/rebounds/assists/PRA markets. They also use a short cache and reserve part of the minute bucket so manual refreshes do not hit the free-plan rate limit. The prediction board stores the full value-under signal universe, including rows that do not yet have a market line. Real sportsbook lines are used as market-tracking anchors so the system can grade whether the under signal beat an actual available number. The first real line observed for a player/stat/date is the anchored line for grading, while later refreshes are stored as line-movement snapshots. A real line does not need to match the generated estimate; line fit is stored only as diagnostic data for later analysis.
 
 Public availability reports can be added through `AVAILABILITY_REPORT_JSON`. These are treated as underperformance-risk inputs, not medical-cycle labels.
 

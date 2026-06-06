@@ -2,7 +2,7 @@ import { config } from "./config.js";
 import { availabilityForPlayer, buildAvailabilityMap } from "./availability.js";
 import { fetchGamesByDate, fetchPlayers, fetchPlayerStats, fetchTeams } from "./balldontlie.js";
 import { fetchEspnGamesByDate, fetchEspnPlayerStatsByDate, fetchEspnPlayers, fetchEspnTeams } from "./espn.js";
-import { fetchPropLinesForGames, linesForPlayer } from "./propLines.js";
+import { fetchPropLinesForGames, linesForPlayer, normalizeName } from "./propLines.js";
 import { trainModelWeights } from "./training.js";
 import { fatigueCycleScore } from "./model.js";
 import {
@@ -197,21 +197,52 @@ export async function runDailyModel(date = isoDate()) {
   if (!games.length) return { date, games: 0, picks: 0, value_unders: 0 };
 
   const players = await getActivePlayers();
-  const lineMap = await fetchPropLinesForGames(gamesAcceptingMarketLines(games));
   const openingLineAnchors = await getOpeningLineAnchors(date);
   const availabilityMap = buildAvailabilityMap(date);
   const weightsByStat = config.modelLearningEnabled ? await getModelWeights() : {};
-  await deletePicksForDate(date);
-  let picksCount = 0;
-  let valueCount = 0;
-  let modelCandidates = 0;
-  let realLinePicks = 0;
+  const playerContexts = [];
 
   for (const player of players) {
     const matchup = await getOpponentForPlayer(player, games);
     if (!matchup) continue;
 
     const logs = await getPlayerLogs(player.id);
+    const openingOnlyPicks = buildPickFeatures(
+      player,
+      logs,
+      date,
+      matchup.opponent?.defensive_rating || 100,
+      openingLineAnchors.get(player.id) || {},
+      weightsByStat,
+      availabilityForPlayer(availabilityMap, player)
+    );
+    playerContexts.push({ player, matchup, logs, openingOnlyPicks });
+  }
+
+  const priorityKeys = playerContexts
+    .flatMap(({ player, openingOnlyPicks }) =>
+      openingOnlyPicks.map((pick) => ({
+        key: `${normalizeName(`${player.first_name} ${player.last_name}`)}:${pick.stat_type}`,
+        fatigue_cycle_score: Number(pick.fatigue_cycle_score || 0),
+        confidence_score: Number(pick.confidence_score || 0),
+        is_value_under: Boolean(pick.is_value_under)
+      }))
+    )
+    .sort((a, b) =>
+      Number(b.is_value_under) - Number(a.is_value_under) ||
+      b.fatigue_cycle_score - a.fatigue_cycle_score ||
+      b.confidence_score - a.confidence_score
+    )
+    .map((item) => item.key);
+
+  const lineMap = await fetchPropLinesForGames(gamesAcceptingMarketLines(games), { priorityKeys });
+  await deletePicksForDate(date);
+  let picksCount = 0;
+  let valueCount = 0;
+  let modelCandidates = 0;
+  let realLinePicks = 0;
+
+  for (const { player, matchup, logs } of playerContexts) {
     const picks = buildPickFeatures(
       player,
       logs,

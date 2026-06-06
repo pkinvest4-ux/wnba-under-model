@@ -22,6 +22,10 @@ const SHARP_STAT_TO_STAT = {
   player_points_rebounds_assists: "pra"
 };
 
+const SHARP_MARKETS = Object.keys(MARKET_TO_STAT).join(",");
+const sharpApiCache = new Map();
+let sharpApiCooldownUntil = 0;
+
 export function normalizeName(name = "") {
   return String(name)
     .toLowerCase()
@@ -31,7 +35,7 @@ export function normalizeName(name = "") {
     .trim();
 }
 
-export async function fetchPropLinesForGames(games = []) {
+export async function fetchPropLinesForGames(games = [], options = {}) {
   const merged = new Map();
   const provider = config.propProvider;
 
@@ -44,7 +48,7 @@ export async function fetchPropLinesForGames(games = []) {
   }
 
   if ((provider === "sharpapi" || provider === "all") && config.sharpApiKey) {
-    mergeLineMaps(merged, await fetchSharpApiLines(games));
+    mergeLineMaps(merged, await fetchSharpApiLines(games, options));
   }
 
   return merged;
@@ -143,18 +147,19 @@ async function fetchTheOddsApiLines(games = []) {
   }
 }
 
-async function fetchSharpApiLines(games = []) {
+async function fetchSharpApiLines(games = [], options = {}) {
   if (!config.sharpApiKey) return new Map();
 
   try {
-    const url = new URL(config.sharpApiBaseUrl);
-    url.searchParams.set("league", config.sharpApiLeague);
-    url.searchParams.set("market", "props");
-    url.searchParams.set("limit", String(config.sharpApiLimit));
-
-    const payload = await sharpApiRequest(url);
-    const rows = Array.isArray(payload) ? payload : payload.data || payload.odds || payload.results || [];
-    const sortedRows = [...rows].sort((a, b) => sharpLinePriority(b) - sharpLinePriority(a));
+    const rows = await fetchSharpApiRows();
+    const priorityRanks = priorityRankMap(options.priorityKeys || []);
+    const sortedRows = [...rows].sort((a, b) => {
+      const aKey = sharpLineKey(a);
+      const bKey = sharpLineKey(b);
+      const aRank = priorityRanks.get(aKey) ?? Number.MAX_SAFE_INTEGER;
+      const bRank = priorityRanks.get(bKey) ?? Number.MAX_SAFE_INTEGER;
+      return aRank - bRank || sharpLinePriority(b) - sharpLinePriority(a);
+    });
     const lineMap = new Map();
 
     for (const row of sortedRows) {
@@ -167,7 +172,7 @@ async function fetchSharpApiLines(games = []) {
       const statType = sharpStatType(row);
       if (!playerName || !statType) continue;
 
-      const key = `${normalizeName(playerName)}:${statType}`;
+      const key = sharpLineKey(row);
       if (!lineMap.has(key)) {
         lineMap.set(key, {
           line: Number(row.line ?? row.point),
@@ -186,6 +191,42 @@ async function fetchSharpApiLines(games = []) {
     console.error("SharpAPI sync failed; falling back where needed", error.message);
     return new Map();
   }
+}
+
+function priorityRankMap(priorityKeys = []) {
+  return new Map(priorityKeys.map((key, index) => [key, index]));
+}
+
+async function fetchSharpApiRows() {
+  const baseUrl = new URL(config.sharpApiBaseUrl);
+  baseUrl.searchParams.set("league", config.sharpApiLeague);
+  baseUrl.searchParams.set("sportsbook", config.sharpApiSportsbooks);
+  baseUrl.searchParams.set("market", SHARP_MARKETS);
+  baseUrl.searchParams.set("live", "false");
+  baseUrl.searchParams.set("limit", String(config.sharpApiLimit));
+
+  const cacheKey = baseUrl.toString();
+  const cached = sharpApiCache.get(cacheKey);
+  const now = Date.now();
+  if (cached && now - cached.fetchedAt < config.sharpApiCacheTtlMs) return cached.rows;
+  if (cached && sharpApiCooldownUntil > now) return cached.rows;
+  if (sharpApiCooldownUntil > now) return [];
+
+  const rows = [];
+  let cursor = null;
+  let pages = 0;
+  do {
+    const pageUrl = new URL(baseUrl);
+    if (cursor) pageUrl.searchParams.set("cursor", cursor);
+    const { payload, headers } = await sharpApiRequest(pageUrl);
+    rows.push(...sharpRowsFromPayload(payload));
+    cursor = payload?.pagination?.has_more ? payload.pagination.next_cursor : null;
+    pages += 1;
+    updateSharpApiRateState(headers);
+  } while (cursor && pages < config.sharpApiMaxPages && Date.now() >= sharpApiCooldownUntil);
+
+  sharpApiCache.set(cacheKey, { fetchedAt: Date.now(), rows });
+  return rows;
 }
 
 export function linesForPlayer(lineMap, player) {
@@ -243,6 +284,12 @@ function sharpStatType(row = {}) {
   return undefined;
 }
 
+function sharpLineKey(row = {}) {
+  const playerName = row.player_name || row.player || row.participant || row.description || "";
+  const statType = sharpStatType(row);
+  return `${normalizeName(playerName)}:${statType || ""}`;
+}
+
 function sharpLinePriority(row = {}) {
   const mainLine = row.is_main_line === false ? 0 : 4;
   const active = row.is_active === false || row.active === false ? 0 : 2;
@@ -274,8 +321,28 @@ async function sharpApiRequest(url) {
       "X-API-Key": config.sharpApiKey
     }
   });
+  if (response.status === 429) {
+    updateSharpApiRateState(response.headers, true);
+    throw new Error(`SharpAPI ${response.status}: rate limit reached`);
+  }
   if (!response.ok) throw new Error(`SharpAPI ${response.status}: ${await response.text()}`);
-  return response.json();
+  return { payload: await response.json(), headers: response.headers };
+}
+
+function sharpRowsFromPayload(payload) {
+  if (Array.isArray(payload)) return payload;
+  return payload?.data || payload?.odds || payload?.results || [];
+}
+
+function updateSharpApiRateState(headers, forcedCooldown = false) {
+  const remaining = Number(headers.get("x-ratelimit-remaining"));
+  const resetSeconds = Number(headers.get("x-ratelimit-reset"));
+  if (!Number.isFinite(remaining) && !forcedCooldown) return;
+
+  if (forcedCooldown || remaining <= config.sharpApiReserveRequests) {
+    const resetMs = Number.isFinite(resetSeconds) ? resetSeconds * 1000 : Date.now() + config.sharpApiCacheTtlMs;
+    sharpApiCooldownUntil = Math.max(sharpApiCooldownUntil, resetMs);
+  }
 }
 
 function mergeLineMaps(target, source) {
