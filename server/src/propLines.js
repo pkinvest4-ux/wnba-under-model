@@ -25,6 +25,7 @@ const SHARP_STAT_TO_STAT = {
 const SHARP_MARKETS = Object.keys(MARKET_TO_STAT).join(",");
 const sharpApiCache = new Map();
 let sharpApiCooldownUntil = 0;
+let sharpApiInFlight = null;
 
 export function normalizeName(name = "") {
   return String(name)
@@ -211,7 +212,15 @@ async function fetchSharpApiRows() {
   if (cached && now - cached.fetchedAt < config.sharpApiCacheTtlMs) return cached.rows;
   if (cached && sharpApiCooldownUntil > now) return cached.rows;
   if (sharpApiCooldownUntil > now) return [];
+  if (sharpApiInFlight) return sharpApiInFlight;
 
+  sharpApiInFlight = fetchSharpApiRowsUncached(baseUrl, cacheKey).finally(() => {
+    sharpApiInFlight = null;
+  });
+  return sharpApiInFlight;
+}
+
+async function fetchSharpApiRowsUncached(baseUrl, cacheKey) {
   const rows = [];
   let cursor = null;
   let pages = 0;

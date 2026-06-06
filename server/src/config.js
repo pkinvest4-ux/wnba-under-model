@@ -19,7 +19,7 @@ export const config = {
   sharpApiLeague: process.env.SHARP_API_LEAGUE || "wnba",
   sharpApiSportsbooks: process.env.SHARP_API_SPORTBOOKS || "draftkings,fanduel",
   sharpApiLimit: Number(process.env.SHARP_API_LIMIT || 200),
-  sharpApiMaxPages: Number(process.env.SHARP_API_MAX_PAGES || 2),
+  sharpApiMaxPages: Number(process.env.SHARP_API_MAX_PAGES || 8),
   sharpApiCacheTtlMs: Number(process.env.SHARP_API_CACHE_TTL_MS || 60000),
   sharpApiReserveRequests: Number(process.env.SHARP_API_RESERVE_REQUESTS || 2),
   enableMockData: process.env.ENABLE_MOCK_DATA !== "false",
