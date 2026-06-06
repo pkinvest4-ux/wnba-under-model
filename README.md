@@ -41,6 +41,7 @@ MODEL_LEARNING_ENABLED=false
 MODEL_LEARNING_MIN_SAMPLES=1000
 REAL_LINE_PICKS_ONLY=false
 PREGAME_REFRESH_WINDOW_MINUTES=75
+PREGAME_FULL_REFRESH_EVERY_MINUTES=30
 AVAILABILITY_REPORT_JSON=[]
 PORT=3000
 ```
@@ -197,7 +198,7 @@ The service runs on its own:
 - Startup automation refreshes rosters/logs, grades recent results, and generates current-day picks.
 - Startup automation keeps feature/outcome data ready for later analysis.
 - Model refreshes run at 10am, noon, 3pm, 5pm, 7pm, and 9pm ET to catch later prop-line availability. The model evaluates and stores all value-under candidates. Real-line picks are the market-tracked subset used to measure performance against sportsbook numbers, not the source of the prediction. Refreshes only pull prop lines for games that have not tipped yet, so live/in-game line movement does not rewrite the anchored bet line.
-- Pregame checks run every 15 minutes from 10am-11pm ET and refresh the full card around 75, 45, and 20 minutes before tip, up to `PREGAME_REFRESH_WINDOW_MINUTES`, so new real-line picks can be added if they start meeting criteria.
+- Pregame checks run every 15 minutes from 10am-11pm ET. They refresh the full card around 75, 45, and 20 minutes before tip, and also perform a throttled full line check every `PREGAME_FULL_REFRESH_EVERY_MINUTES` while games are still upcoming, so new real-line picks can be added if lines appear later.
 - Result sync runs every 30 minutes from 10pm-5:59am ET, then hourly from 6am-2pm ET, so completed games keep getting retried until stats are available and picks settle.
 - The app also grades recent results on startup through `AUTO_BOOTSTRAP=true`, which helps after deploys or service restarts.
 

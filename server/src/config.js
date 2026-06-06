@@ -25,6 +25,7 @@ export const config = {
   modelLearningMinSamples: Number(process.env.MODEL_LEARNING_MIN_SAMPLES || 1000),
   realLinePicksOnly: process.env.REAL_LINE_PICKS_ONLY === "true",
   pregameRefreshWindowMinutes: Number(process.env.PREGAME_REFRESH_WINDOW_MINUTES || 75),
+  pregameFullRefreshEveryMinutes: Number(process.env.PREGAME_FULL_REFRESH_EVERY_MINUTES || 30),
   availabilityReportJson: process.env.AVAILABILITY_REPORT_JSON || "[]",
   clientDistPath: process.env.CLIENT_DIST_PATH || new URL("../../client/dist", import.meta.url).pathname
 };

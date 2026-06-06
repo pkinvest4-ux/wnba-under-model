@@ -28,6 +28,7 @@ import { buildPickFeatures, dateOnly } from "./model.js";
 import { buildMockLogs } from "./mockData.js";
 
 const pregameRefreshes = new Set();
+const fullPregameRefreshes = new Map();
 const PREGAME_REFRESH_BUCKETS = [20, 45, 75];
 
 export function isoDate(date = new Date()) {
@@ -270,6 +271,11 @@ export async function runPregameModelRefresh(now = new Date()) {
   const date = isoDate(now);
   await syncGames(date);
   const games = await getTodayGames(date);
+  const activeUpcoming = games.map((game) => {
+    if (!game.start_time) return false;
+    const minutesUntilTip = (new Date(game.start_time).getTime() - now.getTime()) / 60000;
+    return minutesUntilTip > 0 ? { ...game, minutes_until_tip: Number(minutesUntilTip.toFixed(1)) } : null;
+  }).filter(Boolean);
   const upcoming = games.map((game) => {
     if (!game.start_time) return false;
     const minutesUntilTip = (new Date(game.start_time).getTime() - now.getTime()) / 60000;
@@ -282,11 +288,16 @@ export async function runPregameModelRefresh(now = new Date()) {
     return !pregameRefreshes.has(key);
   });
 
-  if (!dueGames.length) {
+  const throttleDue = isFullPregameRefreshDue(date, now);
+  const shouldFullRefresh = !dueGames.length && activeUpcoming.length && throttleDue;
+
+  if (!dueGames.length && !shouldFullRefresh) {
     return {
       date,
       checked_games: games.length,
       due_games: 0,
+      upcoming_games: activeUpcoming.length,
+      next_full_refresh_after_minutes: throttleDue ? 0 : config.pregameFullRefreshEveryMinutes,
       refreshed: false
     };
   }
@@ -294,6 +305,7 @@ export async function runPregameModelRefresh(now = new Date()) {
   for (const game of dueGames) {
     pregameRefreshes.add(`${date}:${game.external_id}:${game.refresh_bucket}`);
   }
+  if (shouldFullRefresh) fullPregameRefreshes.set(date, now.getTime());
 
   const before = await picksForDate(date, true);
   const refresh = await runDailyModel(date);
@@ -302,23 +314,31 @@ export async function runPregameModelRefresh(now = new Date()) {
     date,
     checked_games: games.length,
     due_games: dueGames.length,
+    upcoming_games: activeUpcoming.length,
+    refresh_reason: dueGames.length ? "tip_bucket" : "throttled_full_line_check",
     refreshed: true,
     previous_value_unders: before.length,
     current_value_unders: after.length,
     value_under_delta: after.length - before.length,
-    games: dueGames.map((game) => ({
+    games: (dueGames.length ? dueGames : activeUpcoming).map((game) => ({
       id: game.external_id,
       start_time: game.start_time,
       minutes_until_tip: game.minutes_until_tip,
-      refresh_bucket: game.refresh_bucket,
+      refresh_bucket: game.refresh_bucket || null,
       matchup: `${game.away_abbreviation || game.away_team} @ ${game.home_abbreviation || game.home_team}`
     })),
     refresh
   };
 }
 
+function isFullPregameRefreshDue(date, now) {
+  const lastRefresh = fullPregameRefreshes.get(date) || 0;
+  return now.getTime() - lastRefresh >= config.pregameFullRefreshEveryMinutes * 60000;
+}
+
 export function clearPregameRefreshMemory() {
   pregameRefreshes.clear();
+  fullPregameRefreshes.clear();
 }
 
 export async function reconcileResultsForDate(date = addDays(isoDate(), -1)) {
