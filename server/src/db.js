@@ -130,6 +130,11 @@ export async function migrate() {
       tracked_bet BOOLEAN DEFAULT false,
       tracked_stake NUMERIC,
       tracked_at TIMESTAMPTZ,
+      optimized_score NUMERIC,
+      optimized_rank INTEGER,
+      optimized_card BOOLEAN DEFAULT false,
+      optimized_profile TEXT,
+      optimized_reasons JSONB DEFAULT '[]'::jsonb,
       is_value_under BOOLEAN DEFAULT false,
       result_value NUMERIC,
       outcome TEXT CHECK (outcome IN ('hit', 'miss', 'push', 'void')),
@@ -212,6 +217,11 @@ export async function migrate() {
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS reasons JSONB DEFAULT '[]'::jsonb;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS factor_breakdown JSONB DEFAULT '[]'::jsonb;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS formula_summary TEXT;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS optimized_score NUMERIC;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS optimized_rank INTEGER;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS optimized_card BOOLEAN DEFAULT false;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS optimized_profile TEXT;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS optimized_reasons JSONB DEFAULT '[]'::jsonb;
     ALTER TABLE games ADD COLUMN IF NOT EXISTS start_time TIMESTAMPTZ;
     ALTER TABLE players ADD COLUMN IF NOT EXISTS roster_status TEXT DEFAULT 'roster';
     ALTER TABLE players ADD COLUMN IF NOT EXISTS last_known_starter BOOLEAN DEFAULT false;

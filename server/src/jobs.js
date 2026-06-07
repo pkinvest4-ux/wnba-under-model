@@ -4,7 +4,7 @@ import { fetchGamesByDate, fetchPlayers, fetchPlayerStats, fetchTeams } from "./
 import { fetchEspnGamesByDate, fetchEspnPlayerStatsByDate, fetchEspnPlayers, fetchEspnTeams } from "./espn.js";
 import { fetchPropLinesForGames, linesForPlayer, normalizeName } from "./propLines.js";
 import { trainModelWeights } from "./training.js";
-import { fatigueCycleScore } from "./model.js";
+import { applyShadowOptimization, fatigueCycleScore } from "./model.js";
 import {
   deletePicksForDate,
   getActivePlayers,
@@ -241,6 +241,7 @@ export async function runDailyModel(date = isoDate()) {
   let valueCount = 0;
   let modelCandidates = 0;
   let realLinePicks = 0;
+  const pickRows = [];
 
   for (const { player, matchup, logs } of playerContexts) {
     const picks = buildPickFeatures(
@@ -253,9 +254,17 @@ export async function runDailyModel(date = isoDate()) {
       availabilityForPlayer(availabilityMap, player)
     );
     modelCandidates += picks.length;
+    pickRows.push({ playerId: player.id, gameId: matchup.game.id, picks });
+  }
 
-    const cardPicks = picks;
-    await savePicks(player.id, matchup.game.id, date, cardPicks);
+  const optimizedPicks = applyShadowOptimization(pickRows.flatMap((row) => row.picks), {
+    minScore: config.shadowOptimizedMinScore
+  });
+  let pickIndex = 0;
+  for (const row of pickRows) {
+    const cardPicks = optimizedPicks.slice(pickIndex, pickIndex + row.picks.length);
+    pickIndex += row.picks.length;
+    await savePicks(row.playerId, row.gameId, date, cardPicks);
     picksCount += cardPicks.length;
     realLinePicks += cardPicks.filter((pick) => pick.real_line != null).length;
     valueCount += cardPicks.filter((pick) => pick.is_value_under).length;
@@ -267,6 +276,7 @@ export async function runDailyModel(date = isoDate()) {
     picks: picksCount,
     value_unders: valueCount,
     real_line_picks: realLinePicks,
+    optimized_card_picks: optimizedPicks.filter((pick) => pick.optimized_card).length,
     model_candidates: modelCandidates,
     real_line_only: false,
     real_line_usage: "tracking_and_market_grading"

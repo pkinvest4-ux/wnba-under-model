@@ -261,6 +261,80 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
   });
 }
 
+export function applyShadowOptimization(picks = [], options = {}) {
+  const minScore = Number(options.minScore ?? 118);
+  const scored = picks.map((pick) => {
+    const optimized_score = shadowOptimizationScore(pick);
+    const optimized_reasons = shadowOptimizationReasons(pick);
+    return {
+      ...pick,
+      optimized_score,
+      optimized_rank: null,
+      optimized_card: false,
+      optimized_profile: "shadow_optimized_v1",
+      optimized_reasons
+    };
+  });
+
+  scored
+    .filter((pick) => pick.is_value_under && pick.real_line != null && pick.optimized_score >= minScore)
+    .sort((a, b) =>
+      b.optimized_score - a.optimized_score ||
+      Number(b.fatigue_cycle_score || 0) - Number(a.fatigue_cycle_score || 0) ||
+      Number(b.confidence_score || 0) - Number(a.confidence_score || 0)
+    )
+    .forEach((pick, index) => {
+      pick.optimized_rank = index + 1;
+      pick.optimized_card = true;
+    });
+
+  return scored;
+}
+
+function shadowOptimizationScore(pick) {
+  if (!pick.is_value_under || pick.real_line == null) return 0;
+  const confidence = Number(pick.confidence_score || 0);
+  const energy = Number(pick.fatigue_cycle_score || 0);
+  const availability = Number(pick.availability_risk || 0);
+  const rest = Number(pick.rest_risk || 0);
+  const load = Number(pick.load_risk || 0);
+
+  const statBonus = {
+    points: 10,
+    assists: 6,
+    rebounds: -2,
+    pra: -8
+  }[pick.stat_type] || 0;
+  const cleanMarketBonus = ["near_market", "close_market"].includes(pick.line_match_quality) ? 4 : 0;
+  const sourceBonus = pick.line_source && pick.line_source !== "generated" ? 12 : 0;
+  const riskPenalty = (pick.risk_tags || []).includes("Low sample") ? 8 : 0;
+
+  return Number((
+    confidence +
+    energy * 28 +
+    availability * 12 +
+    rest * 8 +
+    load * 5 +
+    statBonus +
+    cleanMarketBonus +
+    sourceBonus -
+    riskPenalty
+  ).toFixed(2));
+}
+
+function shadowOptimizationReasons(pick) {
+  const reasons = [];
+  if (pick.real_line != null) reasons.push("Real line");
+  if (Number(pick.confidence_score || 0) >= 85) reasons.push("High confidence");
+  if (Number(pick.fatigue_cycle_score || 0) >= 0.58) reasons.push("Low Energy Index");
+  if (pick.stat_type === "points") reasons.push("Points profile");
+  if (pick.stat_type === "assists") reasons.push("Assist profile");
+  if (Number(pick.availability_risk || 0) >= 0.55) reasons.push("Availability watch");
+  if (Number(pick.days_rest) <= 1) reasons.push("Short rest");
+  if (Number(pick.recent_minutes_avg || 0) >= 30) reasons.push("Heavy minutes");
+  return reasons.slice(0, 5);
+}
+
 function lineQuality(lineGap, realLine) {
   if (realLine == null) return "model_only";
   const absGap = Math.abs(Number(lineGap || 0));

@@ -85,7 +85,7 @@ function App() {
 
   const todayPicks = today.picks || [];
   const historyPicks = history.picks || [];
-  const topRecommendedPicks = useMemo(() => buildTopRecommendations(todayPicks, 15), [todayPicks]);
+  const topRecommendedPicks = useMemo(() => buildTopRecommendations(todayPicks), [todayPicks]);
   const activePicks = activeView === "today" ? todayPicks : activeView === "top15" ? topRecommendedPicks : historyPicks;
   const summary = history.summary || {};
   const topPick = todayPicks[0];
@@ -186,13 +186,13 @@ function App() {
                 {activeView === "analytics"
                   ? `${analytics.gradedCount} graded · ${formatCurrency(analytics.netProfitDollars)} net`
                   : activeView === "top15"
-                    ? `${visiblePicks.length} shown · ${bestProfile ? `${bestProfile.projected_hit_rate}% top profile` : "waiting for picks"}`
+                    ? `${visiblePicks.length} shown · ${bestProfile ? recommendationSummary(bestProfile) : "waiting for picks"}`
                     : `${visiblePicks.length} shown · ${activeView === "today" ? `${todayPicks.length} active rows` : historySubtitle(summary)}`}
               </span>
             </div>
             <div className="segmented" aria-label="Pick view">
               <button className={activeView === "today" ? "active" : ""} onClick={() => { setActiveView("today"); setExpandedPickId(null); }}>Today</button>
-              <button className={activeView === "top15" ? "active" : ""} onClick={() => { setActiveView("top15"); setExpandedPickId(null); }}>Top 15</button>
+              <button className={activeView === "top15" ? "active" : ""} onClick={() => { setActiveView("top15"); setExpandedPickId(null); }}>Optimized</button>
               <button className={activeView === "history" ? "active" : ""} onClick={() => { setActiveView("history"); setExpandedPickId(null); }}>History</button>
               <button className={activeView === "analytics" ? "active" : ""} onClick={() => { setActiveView("analytics"); setExpandedPickId(null); }}>Analytics</button>
             </div>
@@ -321,6 +321,20 @@ function FinancialAnalytics({ analytics, summary }) {
 }
 
 function buildTopRecommendations(picks, limit = 15) {
+  const optimized = (picks || [])
+    .filter((pick) => pick.optimized_card)
+    .sort((a, b) => Number(a.optimized_rank || 999) - Number(b.optimized_rank || 999))
+    .map((pick) => ({
+      ...pick,
+      recommendation_rank: pick.optimized_rank,
+      recommendation_score: pick.optimized_score,
+      recommendation_profile: {
+        projected_hit_rate: null,
+        label: pick.optimized_profile || "Shadow optimized card"
+      }
+    }));
+  if (optimized.length) return optimized;
+
   return (picks || [])
     .filter((pick) => pick.is_value_under !== false)
     .map((pick) => {
@@ -586,7 +600,7 @@ function PickDetails({ pick, snapshots = [] }) {
         <DetailStat label="Real Line" value={pick.real_line ?? "n/a"} />
         <DetailStat label="Line Gap" value={pick.line_gap ?? "n/a"} />
         <DetailStat label="Board Status" value={filterLabel(pick.bettable_status || "research")} />
-        {pick.recommendation_profile && <DetailStat label="Projected Hit" value={`${pick.recommendation_profile.projected_hit_rate}%`} />}
+        {pick.recommendation_profile && <DetailStat label="Card Profile" value={recommendationSummary(pick.recommendation_profile)} />}
         <DetailStat label="Energy Window" value={energyWindowLabel(pick.cycle_window)} />
         <DetailStat label="Availability" value={pick.availability_tags?.length ? pick.availability_tags.join(", ") : "Clear"} />
         <DetailStat label="Closing Line" value={pick.closing_line ?? "pending"} />
@@ -707,10 +721,15 @@ function RecommendationCell({ profile }) {
   if (!profile) return <span className="projection muted">n/a</span>;
   return (
     <div className="projection">
-      <strong>{profile.projected_hit_rate}%</strong>
+      <strong>{profile.projected_hit_rate == null ? "Shadow" : `${profile.projected_hit_rate}%`}</strong>
       <span>{profile.label}</span>
     </div>
   );
+}
+
+function recommendationSummary(profile) {
+  if (!profile) return "waiting for picks";
+  return profile.projected_hit_rate == null ? profile.label : `${profile.projected_hit_rate}% top profile`;
 }
 
 function LineCell({ pick }) {
@@ -1031,7 +1050,7 @@ function uniqueSorted(values) {
 }
 
 function viewLabel(view) {
-  if (view === "top15") return { section: "Premium Card", title: "Top 15 Recommended" };
+  if (view === "top15") return { section: "Shadow Card", title: "Optimized Plays" };
   if (view === "history") return { section: "Results Ledger", title: "Pick History" };
   if (view === "analytics") return { section: "Financials", title: "Financial Breakdown" };
   return { section: "Live Card", title: "Today's Picks" };
@@ -1148,6 +1167,11 @@ function downloadCsv(filename, picks) {
     "bettable_status",
     "recommendation_rank",
     "recommendation_score",
+    "optimized_card",
+    "optimized_rank",
+    "optimized_score",
+    "optimized_profile",
+    "optimized_reasons",
     "recommendation_projected_hit_rate",
     "recommendation_profile",
     "watchlist_reason",

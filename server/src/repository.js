@@ -206,9 +206,11 @@ export async function savePicks(playerId, gameId, gameDate, picks) {
           under_hit_rate, rest_risk, load_risk, opponent_risk, b2b_risk, model_version,
           reasons, factor_breakdown, formula_summary, line_source, bookmaker, odds_price,
           estimated_line, real_line, line_gap, line_match_quality, line_alerts,
-          bettable_status, watchlist_reason, risk_tags, is_value_under
+          bettable_status, watchlist_reason, risk_tags,
+          optimized_score, optimized_rank, optimized_card, optimized_profile, optimized_reasons,
+          is_value_under
         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::jsonb, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28::jsonb, $29::jsonb, $30, $31, $32, $33, $34, $35, $36, $37, $38::jsonb, $39, $40, $41::jsonb, $42)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::jsonb, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28::jsonb, $29::jsonb, $30, $31, $32, $33, $34, $35, $36, $37, $38::jsonb, $39, $40, $41::jsonb, $42, $43, $44, $45, $46::jsonb, $47)
          ON CONFLICT (player_id, game_date, stat_type, line) DO UPDATE SET
            game_id = EXCLUDED.game_id,
            confidence_score = EXCLUDED.confidence_score,
@@ -247,6 +249,11 @@ export async function savePicks(playerId, gameId, gameDate, picks) {
            bettable_status = EXCLUDED.bettable_status,
            watchlist_reason = EXCLUDED.watchlist_reason,
            risk_tags = EXCLUDED.risk_tags,
+           optimized_score = EXCLUDED.optimized_score,
+           optimized_rank = EXCLUDED.optimized_rank,
+           optimized_card = EXCLUDED.optimized_card,
+           optimized_profile = EXCLUDED.optimized_profile,
+           optimized_reasons = EXCLUDED.optimized_reasons,
            is_value_under = EXCLUDED.is_value_under`,
         [
           playerId,
@@ -290,6 +297,11 @@ export async function savePicks(playerId, gameId, gameDate, picks) {
           pick.bettable_status || "research",
           pick.watchlist_reason || null,
           JSON.stringify(pick.risk_tags || []),
+          pick.optimized_score ?? null,
+          pick.optimized_rank ?? null,
+          Boolean(pick.optimized_card),
+          pick.optimized_profile || null,
+          JSON.stringify(pick.optimized_reasons || []),
           pick.is_value_under
         ]
       );
