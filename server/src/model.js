@@ -44,12 +44,15 @@ export function inferFatigueCycleOffset(logs = [], firstTrackedGameDate = null) 
 
 export function inferFatigueCycleProfile(logs = [], firstTrackedGameDate = null) {
   const sample = logs.filter((log) => Number(log.minutes || 0) >= 8);
-  if (sample.length < 6) return { offset: 0, confidence: 0, sample_size: sample.length };
+  if (sample.length < 6) return { offset: 0, confidence: 0, sample_size: sample.length, down_events: 0, peak_hits: 0 };
   const anchorDate = firstTrackedGameDate || sample[sample.length - 1]?.game_date;
 
   const values = sample.map((log) => statValue(log, "pra"));
-  const average = values.reduce((sum, value) => sum + value, 0) / values.length;
-  const variance = values.reduce((sum, value) => sum + (value - average) ** 2, 0) / values.length;
+  const totalMinutes = sample.reduce((sum, log) => sum + Number(log.minutes || 0), 0) || 1;
+  const expectedPerMinute = values.reduce((sum, value) => sum + value, 0) / totalMinutes;
+  const residuals = sample.map((log, index) => values[index] - expectedPerMinute * Number(log.minutes || 0));
+  const residualAverage = residuals.reduce((sum, value) => sum + value, 0) / residuals.length;
+  const variance = residuals.reduce((sum, value) => sum + (value - residualAverage) ** 2, 0) / residuals.length;
   const deviation = Math.sqrt(variance) || 1;
 
   let bestOffset = 0;
@@ -58,7 +61,7 @@ export function inferFatigueCycleProfile(logs = [], firstTrackedGameDate = null)
   for (let offset = 0; offset < CYCLE_PERIOD_DAYS; offset += 1) {
     const score = sample.reduce((total, log, index) => {
       const baseDay = fatigueCycleDay(anchorDate || log.game_date, log.game_date);
-      const downMagnitude = Math.max(0, (average - values[index]) / deviation);
+      const downMagnitude = Math.max(0, -residuals[index] / deviation);
       return total + cycleScoreFromDay((baseDay + offset) % CYCLE_PERIOD_DAYS) * downMagnitude;
     }, 0);
     scores.push(score);
@@ -68,11 +71,26 @@ export function inferFatigueCycleProfile(logs = [], firstTrackedGameDate = null)
     }
   }
   const averageScore = scores.reduce((sum, score) => sum + score, 0) / scores.length;
-  const confidence = Math.max(0, Math.min(1, (bestScore - averageScore) / (sample.length || 1)));
+  const scoreDeviation = Math.sqrt(scores.reduce((sum, score) => sum + (score - averageScore) ** 2, 0) / scores.length) || 1;
+  const downEvents = sample
+    .map((log, index) => ({
+      log,
+      downMagnitude: Math.max(0, -residuals[index] / deviation),
+      day: (fatigueCycleDay(anchorDate || log.game_date, log.game_date) + bestOffset) % CYCLE_PERIOD_DAYS
+    }))
+    .filter((event) => event.downMagnitude >= 0.75);
+  const peakHits = downEvents.filter((event) => cycleScoreFromDay(event.day) >= 0.85).length;
+  const separationConfidence = Math.max(0, Math.min(1, (bestScore - averageScore) / (scoreDeviation * 3)));
+  const sampleConfidence = Math.min(1, sample.length / 18);
+  const clusterConfidence = downEvents.length ? Math.min(1, (peakHits / downEvents.length) / 0.36) : 0;
+  const confidence = separationConfidence * 0.45 + sampleConfidence * 0.2 + clusterConfidence * 0.35;
+
   return {
     offset: bestOffset,
     confidence: Number(confidence.toFixed(4)),
-    sample_size: sample.length
+    sample_size: sample.length,
+    down_events: downEvents.length,
+    peak_hits: peakHits
   };
 }
 
@@ -194,6 +212,8 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
   const baseCycleDay = fatigueCycleDay(player.first_tracked_game_date || gameDate, gameDate);
   const fatigue_cycle_day = (baseCycleDay + fatigue_cycle_offset) % CYCLE_PERIOD_DAYS;
   const fatigue_cycle_score = cycleScoreFromDay(fatigue_cycle_day);
+  const fatigue_cycle_peak_score = fatigue_cycle_score >= 0.85 ? fatigue_cycle_score : 0;
+  const fatigue_cycle_peak_window = fatigue_cycle_score >= 0.85;
   const recent_minutes_avg = rollingMinutes(sortedLogs, gameDate);
   const season_minutes_avg = seasonMinutesAverage(sortedLogs);
   const back_to_back = daysRest === 0;
@@ -245,6 +265,10 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
       fatigue_cycle_offset,
       fatigue_cycle_confidence: fatigueCycleProfile.confidence,
       fatigue_cycle_sample_size: fatigueCycleProfile.sample_size,
+      fatigue_cycle_down_events: fatigueCycleProfile.down_events || 0,
+      fatigue_cycle_peak_hits: fatigueCycleProfile.peak_hits || 0,
+      fatigue_cycle_peak_score,
+      fatigue_cycle_peak_window,
       cycle_window: cycleWindow(fatigue_cycle_score),
       energy_band: energyBand(fatigue_cycle_score),
       opponent_def_rating: opponentDefRating,
@@ -310,6 +334,8 @@ function shadowOptimizationScore(pick) {
   if (!pick.is_value_under || pick.real_line == null) return 0;
   const confidence = Number(pick.confidence_score || 0);
   const energy = Number(pick.fatigue_cycle_score || 0);
+  const peak = Number(pick.fatigue_cycle_peak_score || 0);
+  const cycleReliability = Number(pick.fatigue_cycle_confidence || 0);
   const availability = Number(pick.availability_risk || 0);
   const rest = Number(pick.rest_risk || 0);
   const minutesDip = Number(pick.load_risk || 0);
@@ -323,17 +349,23 @@ function shadowOptimizationScore(pick) {
   const cleanMarketBonus = ["near_market", "close_market"].includes(pick.line_match_quality) ? 4 : 0;
   const sourceBonus = pick.line_source && pick.line_source !== "generated" ? 12 : 0;
   const riskPenalty = (pick.risk_tags || []).includes("Low sample") ? 8 : 0;
+  const peakBonus = peak >= 0.85 ? 22 + cycleReliability * 12 : 0;
+  const midLowPenalty = energy >= 0.7 && energy < 0.85 ? 22 : 0;
+  const weakCyclePenalty = energy >= 0.58 && cycleReliability < 0.25 ? 8 : 0;
 
   return Number((
     confidence +
-    energy * 28 +
+    energy * 14 +
+    peakBonus +
     availability * 12 +
     rest * 8 +
     minutesDip * 8 +
     statBonus +
     cleanMarketBonus +
     sourceBonus -
-    riskPenalty
+    riskPenalty -
+    midLowPenalty -
+    weakCyclePenalty
   ).toFixed(2));
 }
 
@@ -341,7 +373,9 @@ function shadowOptimizationReasons(pick) {
   const reasons = [];
   if (pick.real_line != null) reasons.push("Real line");
   if (Number(pick.confidence_score || 0) >= 85) reasons.push("High confidence");
-  if (Number(pick.fatigue_cycle_score || 0) >= 0.58) reasons.push("Low Energy Index");
+  if (Number(pick.fatigue_cycle_peak_score || 0) >= 0.85) reasons.push("Peak Energy Index");
+  else if (Number(pick.fatigue_cycle_score || 0) >= 0.58) reasons.push("Low Energy Index");
+  if (Number(pick.fatigue_cycle_score || 0) >= 0.7 && Number(pick.fatigue_cycle_score || 0) < 0.85) reasons.push("Mid-energy caution");
   if (pick.stat_type === "points") reasons.push("Points profile");
   if (pick.stat_type === "assists") reasons.push("Assist profile");
   if (Number(pick.availability_risk || 0) >= 0.55) reasons.push("Availability watch");

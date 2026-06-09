@@ -381,10 +381,17 @@ function recommendationProfile(pick) {
   const confidence = Number(pick.confidence_score || 0);
   const lowerRebound = rebounds && Number(pick.line || 0) <= 6.5;
   const lowEnergy = pick.energy_index === "low" || pick.cycle_window === "low_output_window";
+  const peakEnergy = Boolean(pick.fatigue_cycle_peak_window) || Number(pick.fatigue_cycle_peak_score || 0) >= 0.85;
   const energyContribution = energyContributionPercent(pick);
 
+  if (peakEnergy && points && confidence >= 80 && clean) {
+    return { projected_hit_rate: 88, label: "Peak Energy points profile" };
+  }
+  if (peakEnergy && confidence >= 80 && clean) {
+    return { projected_hit_rate: 82, label: "Peak Energy profile" };
+  }
   if (lowEnergy && confidence >= 80 && clean) {
-    return { projected_hit_rate: 86, label: "Real-line Energy profile" };
+    return { projected_hit_rate: 70, label: "Low Energy research profile" };
   }
   if (assists && b2b && clean) {
     return { projected_hit_rate: 82, label: "Energy plus B2B profile" };
@@ -1184,6 +1191,10 @@ function downloadCsv(filename, picks) {
     "fatigue_cycle_offset",
     "fatigue_cycle_confidence",
     "fatigue_cycle_sample_size",
+    "fatigue_cycle_down_events",
+    "fatigue_cycle_peak_hits",
+    "fatigue_cycle_peak_score",
+    "fatigue_cycle_peak_window",
     "cycle_window",
     "availability_risk",
     "availability_status",

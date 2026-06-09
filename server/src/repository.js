@@ -201,6 +201,7 @@ export async function savePicks(playerId, gameId, gameDate, picks) {
         `INSERT INTO picks (
           player_id, game_id, game_date, stat_type, line, confidence_score, fatigue_cycle_score,
           fatigue_cycle_day, fatigue_cycle_offset, fatigue_cycle_confidence, fatigue_cycle_sample_size,
+          fatigue_cycle_down_events, fatigue_cycle_peak_hits, fatigue_cycle_peak_score, fatigue_cycle_peak_window,
           cycle_window, energy_band, opponent_def_rating, availability_risk, availability_status, availability_note, availability_tags,
           recent_minutes_avg, season_minutes_avg, days_rest, back_to_back,
           under_hit_rate, rest_risk, load_risk, opponent_risk, b2b_risk, model_version,
@@ -210,7 +211,7 @@ export async function savePicks(playerId, gameId, gameDate, picks) {
           optimized_score, optimized_rank, optimized_card, optimized_profile, optimized_reasons,
           is_value_under
         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::jsonb, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29::jsonb, $30::jsonb, $31, $32, $33, $34, $35, $36, $37, $38, $39::jsonb, $40, $41, $42::jsonb, $43, $44, $45, $46, $47::jsonb, $48)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21::jsonb, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32::jsonb, $33::jsonb, $34, $35, $36, $37, $38, $39, $40, $41, $42::jsonb, $43, $44, $45::jsonb, $46, $47, $48, $49, $50::jsonb, $51)
          ON CONFLICT (player_id, game_date, stat_type, line) DO UPDATE SET
            game_id = EXCLUDED.game_id,
            confidence_score = EXCLUDED.confidence_score,
@@ -219,6 +220,10 @@ export async function savePicks(playerId, gameId, gameDate, picks) {
            fatigue_cycle_offset = EXCLUDED.fatigue_cycle_offset,
            fatigue_cycle_confidence = EXCLUDED.fatigue_cycle_confidence,
            fatigue_cycle_sample_size = EXCLUDED.fatigue_cycle_sample_size,
+           fatigue_cycle_down_events = EXCLUDED.fatigue_cycle_down_events,
+           fatigue_cycle_peak_hits = EXCLUDED.fatigue_cycle_peak_hits,
+           fatigue_cycle_peak_score = EXCLUDED.fatigue_cycle_peak_score,
+           fatigue_cycle_peak_window = EXCLUDED.fatigue_cycle_peak_window,
            cycle_window = EXCLUDED.cycle_window,
            energy_band = EXCLUDED.energy_band,
            opponent_def_rating = EXCLUDED.opponent_def_rating,
@@ -268,6 +273,10 @@ export async function savePicks(playerId, gameId, gameDate, picks) {
           pick.fatigue_cycle_offset ?? null,
           pick.fatigue_cycle_confidence ?? null,
           pick.fatigue_cycle_sample_size ?? null,
+          pick.fatigue_cycle_down_events ?? null,
+          pick.fatigue_cycle_peak_hits ?? null,
+          pick.fatigue_cycle_peak_score ?? null,
+          Boolean(pick.fatigue_cycle_peak_window),
           pick.cycle_window || null,
           pick.energy_band,
           pick.opponent_def_rating,

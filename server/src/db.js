@@ -90,6 +90,10 @@ export async function migrate() {
       fatigue_cycle_offset INTEGER,
       fatigue_cycle_confidence NUMERIC,
       fatigue_cycle_sample_size INTEGER,
+      fatigue_cycle_down_events INTEGER,
+      fatigue_cycle_peak_hits INTEGER,
+      fatigue_cycle_peak_score NUMERIC,
+      fatigue_cycle_peak_window BOOLEAN DEFAULT false,
       cycle_window TEXT,
       energy_band TEXT NOT NULL,
       opponent_def_rating NUMERIC,
@@ -192,6 +196,10 @@ export async function migrate() {
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS fatigue_cycle_offset INTEGER;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS fatigue_cycle_confidence NUMERIC;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS fatigue_cycle_sample_size INTEGER;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS fatigue_cycle_down_events INTEGER;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS fatigue_cycle_peak_hits INTEGER;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS fatigue_cycle_peak_score NUMERIC;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS fatigue_cycle_peak_window BOOLEAN DEFAULT false;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS cycle_window TEXT;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS closing_line NUMERIC;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS closing_real_line NUMERIC;
