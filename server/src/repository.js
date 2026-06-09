@@ -211,7 +211,7 @@ export async function savePicks(playerId, gameId, gameDate, picks) {
           optimized_score, optimized_rank, optimized_card, optimized_profile, optimized_reasons,
           is_value_under
         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21::jsonb, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32::jsonb, $33::jsonb, $34, $35, $36, $37, $38, $39, $40, $41, $42::jsonb, $43, $44, $45::jsonb, $46, $47, $48, $49, $50::jsonb, $51)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22::jsonb, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33::jsonb, $34::jsonb, $35, $36, $37, $38, $39, $40, $41, $42, $43::jsonb, $44, $45, $46::jsonb, $47, $48, $49, $50, $51::jsonb, $52)
          ON CONFLICT (player_id, game_date, stat_type, line) DO UPDATE SET
            game_id = EXCLUDED.game_id,
            confidence_score = EXCLUDED.confidence_score,
