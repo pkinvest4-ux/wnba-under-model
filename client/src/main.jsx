@@ -349,7 +349,8 @@ function buildTopRecommendations(picks, limit = 15) {
         (pick.stat_type === "assists" ? 45 : 0) +
         (pick.bettable_status === "bettable" ? 60 : 0) -
         (hasRiskTag(pick, "Low sample") ? 250 : 0) -
-        (hasRiskTag(pick, "Heavy minutes") ? 220 : 0) -
+        (hasRiskTag(pick, "Minutes uncertainty") ? 160 : 0) +
+        (hasRiskTag(pick, "Minutes dip") ? 80 : 0) -
         (pick.stat_type === "pra" ? 70 : 0) -
         (pick.stat_type === "rebounds" && Number(pick.line || 0) > 6.5 ? 120 : 0);
 
@@ -371,8 +372,8 @@ function energyContributionPercent(pick) {
 
 function recommendationProfile(pick) {
   const lowSample = hasRiskTag(pick, "Low sample");
-  const heavyMinutes = hasRiskTag(pick, "Heavy minutes");
-  const clean = !lowSample && !heavyMinutes;
+  const minutesUncertainty = hasRiskTag(pick, "Minutes uncertainty");
+  const clean = !lowSample && !minutesUncertainty;
   const assists = pick.stat_type === "assists";
   const points = pick.stat_type === "points";
   const rebounds = pick.stat_type === "rebounds";
@@ -403,8 +404,8 @@ function recommendationProfile(pick) {
   if (confidence >= 80 && clean) {
     return { projected_hit_rate: 64, label: "High-confidence research profile" };
   }
-  if (lowSample || heavyMinutes) {
-    return { projected_hit_rate: 54, label: lowSample ? "Caution: low sample" : "Caution: heavy minutes" };
+  if (lowSample || minutesUncertainty) {
+    return { projected_hit_rate: 54, label: lowSample ? "Caution: low sample" : "Caution: minutes uncertainty" };
   }
   return { projected_hit_rate: Math.max(50, Math.min(63, Math.round(Number(pick.confidence_score || 50) * 0.72))), label: "Broad research profile" };
 }
@@ -607,6 +608,7 @@ function PickDetails({ pick, snapshots = [] }) {
         <DetailStat label="Closing Source" value={pick.closing_line_source ? filterLabel(sourceKey({ line_source: pick.closing_line_source })) : "pending"} />
         <DetailStat label="Odds Price" value={pick.odds_price ?? "n/a"} />
         <DetailStat label="Recent Minutes" value={formatNumber(pick.recent_minutes_avg)} />
+        <DetailStat label="Normal Minutes" value={formatNumber(pick.season_minutes_avg)} />
         <DetailStat label="Days Rest" value={pick.days_rest ?? "n/a"} />
         <DetailStat label="Back-to-Back" value={pick.back_to_back ? "Yes" : "No"} />
         <DetailStat label="Opponent Rating" value={formatNumber(pick.opponent_def_rating)} />
@@ -1189,6 +1191,7 @@ function downloadCsv(filename, picks) {
     "model_version",
     "under_hit_rate",
     "recent_minutes_avg",
+    "season_minutes_avg",
     "days_rest",
     "back_to_back",
     "reasons",

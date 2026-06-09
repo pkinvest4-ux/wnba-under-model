@@ -98,6 +98,7 @@ export async function migrate() {
       availability_note TEXT,
       availability_tags JSONB DEFAULT '[]'::jsonb,
       recent_minutes_avg NUMERIC,
+      season_minutes_avg NUMERIC,
       days_rest INTEGER,
       back_to_back BOOLEAN,
       under_hit_rate NUMERIC,
@@ -222,6 +223,7 @@ export async function migrate() {
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS optimized_card BOOLEAN DEFAULT false;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS optimized_profile TEXT;
     ALTER TABLE picks ADD COLUMN IF NOT EXISTS optimized_reasons JSONB DEFAULT '[]'::jsonb;
+    ALTER TABLE picks ADD COLUMN IF NOT EXISTS season_minutes_avg NUMERIC;
     ALTER TABLE games ADD COLUMN IF NOT EXISTS start_time TIMESTAMPTZ;
     ALTER TABLE players ADD COLUMN IF NOT EXISTS roster_status TEXT DEFAULT 'roster';
     ALTER TABLE players ADD COLUMN IF NOT EXISTS last_known_starter BOOLEAN DEFAULT false;

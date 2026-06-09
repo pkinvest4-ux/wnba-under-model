@@ -241,6 +241,7 @@ function toPickDto(row) {
     availability_note: row.availability_note,
     availability_tags: row.availability_tags || [],
     recent_minutes_avg: row.recent_minutes_avg === null ? null : Number(row.recent_minutes_avg),
+    season_minutes_avg: row.season_minutes_avg === null ? null : Number(row.season_minutes_avg),
     days_rest: row.days_rest,
     back_to_back: row.back_to_back,
     under_hit_rate: row.under_hit_rate === null ? null : Number(row.under_hit_rate),

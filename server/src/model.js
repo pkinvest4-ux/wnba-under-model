@@ -109,10 +109,16 @@ export function underHitRate(logs, statType, line) {
   return Number((hits / logs.length).toFixed(4));
 }
 
-export function normalizedRisks({ days_rest, recent_minutes_avg, back_to_back, opponent_def_rating }) {
+export function normalizedRisks({ days_rest, recent_minutes_avg, season_minutes_avg, back_to_back, opponent_def_rating }) {
+  const recentMinutes = Number(recent_minutes_avg || 0);
+  const baselineMinutes = Number(season_minutes_avg || 0);
+  const minutesDropRisk = baselineMinutes >= 12 && recentMinutes > 0
+    ? Math.min(1, Math.max(0, (baselineMinutes - recentMinutes) / Math.max(6, baselineMinutes * 0.35)))
+    : 0;
+
   return {
     rest_risk: days_rest <= 1 ? 1 : days_rest === 2 ? 0.55 : 0.2,
-    load_risk: Math.min(1, Math.max(0, (Number(recent_minutes_avg || 0) - 24) / 12)),
+    load_risk: minutesDropRisk,
     opponent_risk: Math.min(1, Math.max(0, (Number(opponent_def_rating || 100) - 96) / 10)),
     b2b_risk: back_to_back ? 1 : 0
   };
@@ -130,8 +136,14 @@ export function rollingMinutes(logs, gameDate) {
   return Number((week.reduce((sum, log) => sum + Number(log.minutes || 0), 0) / week.length).toFixed(2));
 }
 
-export function scoreUnder({ fatigue_cycle_score, days_rest, recent_minutes_avg, back_to_back, opponent_def_rating, under_hit_rate, availability_risk }) {
-  const risks = normalizedRisks({ days_rest, recent_minutes_avg, back_to_back, opponent_def_rating });
+export function seasonMinutesAverage(logs = []) {
+  const sample = logs.filter((log) => Number(log.minutes || 0) > 0);
+  if (!sample.length) return 0;
+  return Number((sample.reduce((sum, log) => sum + Number(log.minutes || 0), 0) / sample.length).toFixed(2));
+}
+
+export function scoreUnder({ fatigue_cycle_score, days_rest, recent_minutes_avg, season_minutes_avg, back_to_back, opponent_def_rating, under_hit_rate, availability_risk }) {
+  const risks = normalizedRisks({ days_rest, recent_minutes_avg, season_minutes_avg, back_to_back, opponent_def_rating });
   const personal = Number(under_hit_rate ?? 0.5);
   const cycleRisk = fatigueCycleRisk(fatigue_cycle_score);
 
@@ -183,6 +195,7 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
   const fatigue_cycle_day = (baseCycleDay + fatigue_cycle_offset) % CYCLE_PERIOD_DAYS;
   const fatigue_cycle_score = cycleScoreFromDay(fatigue_cycle_day);
   const recent_minutes_avg = rollingMinutes(sortedLogs, gameDate);
+  const season_minutes_avg = seasonMinutesAverage(sortedLogs);
   const back_to_back = daysRest === 0;
 
   return STAT_KEYS.map((statType) => {
@@ -201,6 +214,7 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
       fatigue_cycle_risk: fatigueCycleRisk(fatigue_cycle_score),
       days_rest: daysRest,
       recent_minutes_avg,
+      season_minutes_avg,
       back_to_back,
       opponent_def_rating: opponentDefRating,
       availability_risk: Number(availabilityReport.availability_risk || 0),
@@ -235,6 +249,7 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
       energy_band: energyBand(fatigue_cycle_score),
       opponent_def_rating: opponentDefRating,
       recent_minutes_avg,
+      season_minutes_avg,
       days_rest: daysRest,
       back_to_back,
       availability_risk: Number(availabilityReport.availability_risk || 0),
@@ -297,7 +312,7 @@ function shadowOptimizationScore(pick) {
   const energy = Number(pick.fatigue_cycle_score || 0);
   const availability = Number(pick.availability_risk || 0);
   const rest = Number(pick.rest_risk || 0);
-  const load = Number(pick.load_risk || 0);
+  const minutesDip = Number(pick.load_risk || 0);
 
   const statBonus = {
     points: 10,
@@ -314,7 +329,7 @@ function shadowOptimizationScore(pick) {
     energy * 28 +
     availability * 12 +
     rest * 8 +
-    load * 5 +
+    minutesDip * 8 +
     statBonus +
     cleanMarketBonus +
     sourceBonus -
@@ -331,7 +346,7 @@ function shadowOptimizationReasons(pick) {
   if (pick.stat_type === "assists") reasons.push("Assist profile");
   if (Number(pick.availability_risk || 0) >= 0.55) reasons.push("Availability watch");
   if (Number(pick.days_rest) <= 1) reasons.push("Short rest");
-  if (Number(pick.recent_minutes_avg || 0) >= 30) reasons.push("Heavy minutes");
+  if (Number(pick.load_risk || 0) >= 0.45) reasons.push("Minutes dip");
   return reasons.slice(0, 5);
 }
 
@@ -376,7 +391,7 @@ function riskTags({ confidence_score, sortedLogs, allFeatures, lineMatchQuality,
   if (Number(confidence_score || 0) >= 85) tags.push("High confidence");
   if ((sortedLogs || []).length < 5) tags.push("Low sample");
   if (Number(allFeatures.recent_minutes_avg || 0) < 8) tags.push("Minutes uncertainty");
-  if (Number(allFeatures.recent_minutes_avg || 0) >= 30) tags.push("Heavy minutes");
+  if (Number(allFeatures.load_risk || 0) >= 0.45) tags.push("Minutes dip");
   if (Number(allFeatures.days_rest) <= 1) tags.push("Short rest");
   if (allFeatures.back_to_back) tags.push("B2B");
   for (const tag of allFeatures.availability_tags || []) tags.push(tag);
@@ -392,8 +407,8 @@ export function pickReasons(features, breakdown = []) {
   if (Number(features.days_rest) <= 1) {
     reasons.push({ label: "Short rest", score: features.rest_risk });
   }
-  if (Number(features.recent_minutes_avg || 0) >= 30) {
-    reasons.push({ label: "Heavy minutes", score: features.load_risk });
+  if (Number(features.load_risk || 0) >= 0.45) {
+    reasons.push({ label: "Minutes dip", score: features.load_risk });
   }
   if (Number(features.availability_risk || 0) >= 0.55) {
     reasons.push({ label: "Availability watch", score: 1.1 + Number(features.availability_risk || 0) });
@@ -423,7 +438,7 @@ export function factorBreakdown(features, learnedWeights) {
   const factors = [
     { key: "fatigue_cycle_score", label: "Energy Index", weight: Number(weights.fatigue_cycle_weight), value: Number(features.fatigue_cycle_risk ?? fatigueCycleRisk(features.fatigue_cycle_score)) },
     { key: "rest_risk", label: "Rest", weight: Number(weights.rest_weight), value: Number(features.rest_risk || 0) },
-    { key: "load_risk", label: "Minutes", weight: Number(weights.load_weight), value: Number(features.load_risk || 0) },
+    { key: "load_risk", label: "Minutes dip", weight: Number(weights.load_weight), value: Number(features.load_risk || 0) },
     { key: "b2b_risk", label: "B2B", weight: Number(weights.b2b_weight), value: Number(features.b2b_risk || 0) },
     { key: "opponent_risk", label: "Matchup", weight: Number(weights.opponent_weight), value: Number(features.opponent_risk || 0) },
     { key: "availability_risk", label: "Availability", weight: Number(weights.availability_weight ?? FIXED_WEIGHTS.availability_weight), value: Number(features.availability_risk || 0) },
