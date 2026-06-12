@@ -310,7 +310,7 @@ export function applyShadowOptimization(picks = [], options = {}) {
       optimized_score,
       optimized_rank: null,
       optimized_card: false,
-      optimized_profile: "shadow_optimized_v1",
+      optimized_profile: "real_line_precision_v2",
       optimized_reasons
     };
   });
@@ -335,37 +335,58 @@ function shadowOptimizationScore(pick) {
   const confidence = Number(pick.confidence_score || 0);
   const energy = Number(pick.fatigue_cycle_score || 0);
   const peak = Number(pick.fatigue_cycle_peak_score || 0);
-  const cycleReliability = Number(pick.fatigue_cycle_confidence || 0);
   const availability = Number(pick.availability_risk || 0);
-  const rest = Number(pick.rest_risk || 0);
   const minutesDip = Number(pick.load_risk || 0);
+  const sampleSize = Number(pick.fatigue_cycle_sample_size || 0);
 
   const statBonus = {
-    points: 10,
-    assists: 6,
-    rebounds: -2,
-    pra: -8
+    points: 24,
+    assists: 7,
+    rebounds: -18,
+    pra: -30
   }[pick.stat_type] || 0;
-  const cleanMarketBonus = ["near_market", "close_market"].includes(pick.line_match_quality) ? 4 : 0;
-  const sourceBonus = pick.line_source && pick.line_source !== "generated" ? 12 : 0;
+  const lineBonus = {
+    near_market: 12,
+    close_market: 4,
+    wide_gap: -8
+  }[pick.line_match_quality] || 0;
   const riskPenalty = (pick.risk_tags || []).includes("Low sample") ? 8 : 0;
-  const peakBonus = peak >= 0.85 ? 22 + cycleReliability * 12 : 0;
-  const midLowPenalty = energy >= 0.7 && energy < 0.85 ? 22 : 0;
-  const weakCyclePenalty = energy >= 0.58 && cycleReliability < 0.25 ? 8 : 0;
+  const peakBonus = peak >= 0.85 ? 34 : 0;
+  const peakHighBonus = peak >= 0.95 ? 10 : 0;
+  const lowEnergyBonus = energy >= 0.58 && energy < 0.7 ? 5 : 0;
+  const midLowPenalty = energy >= 0.7 && energy < 0.85 ? 35 : 0;
+  const confidenceShape = confidence >= 95
+    ? -24
+    : confidence >= 80 && confidence < 85
+      ? 10
+      : confidence >= 85 && confidence < 95
+        ? 2
+        : confidence >= 70
+          ? 0
+          : -10;
+  const restShape = Number(pick.days_rest) === 2
+    ? -12
+    : Number(pick.days_rest) === 1
+      ? 5
+      : Number(pick.days_rest) >= 5
+        ? 6
+        : 0;
 
   return Number((
-    confidence +
-    energy * 14 +
+    70 +
+    energy * 10 +
     peakBonus +
+    peakHighBonus +
+    lowEnergyBonus +
     availability * 12 +
-    rest * 8 +
-    minutesDip * 8 +
+    minutesDip * 6 +
+    Math.min(sampleSize, 20) * 0.2 +
+    confidenceShape +
+    restShape +
     statBonus +
-    cleanMarketBonus +
-    sourceBonus -
+    lineBonus -
     riskPenalty -
-    midLowPenalty -
-    weakCyclePenalty
+    midLowPenalty
   ).toFixed(2));
 }
 
