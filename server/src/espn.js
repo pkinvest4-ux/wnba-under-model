@@ -1,10 +1,29 @@
 const ESPN_SITE = "https://site.api.espn.com/apis/site/v2/sports/basketball/wnba";
 const ESPN_CORE = "https://sports.core.api.espn.com/v2/sports/basketball/leagues/wnba";
+const FETCH_TIMEOUT_MS = 15000;
+const RETRY_DELAYS_MS = [0, 750, 2000];
 
 async function getJson(url) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`ESPN ${response.status}: ${await response.text()}`);
-  return response.json();
+  let lastError;
+  for (const delay of RETRY_DELAYS_MS) {
+    if (delay) await wait(delay);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      if (!response.ok) throw new Error(`ESPN ${response.status}: ${await response.text()}`);
+      return response.json();
+    } catch (error) {
+      lastError = error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  throw lastError;
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function httpsRef(ref) {
