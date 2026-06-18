@@ -301,7 +301,7 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
 }
 
 export function applyShadowOptimization(picks = [], options = {}) {
-  const minScore = Number(options.minScore ?? 118);
+  const minScore = Number(options.minScore ?? 0);
   const scored = picks.map((pick) => {
     const optimized_score = shadowOptimizationScore(pick);
     const optimized_reasons = shadowOptimizationReasons(pick);
@@ -310,13 +310,13 @@ export function applyShadowOptimization(picks = [], options = {}) {
       optimized_score,
       optimized_rank: null,
       optimized_card: false,
-      optimized_profile: "real_line_precision_v2",
+      optimized_profile: "market_aligned_profit_v3",
       optimized_reasons
     };
   });
 
   scored
-    .filter((pick) => pick.is_value_under && pick.real_line != null && pick.optimized_score >= minScore)
+    .filter((pick) => isOptimizedProfitPick(pick, minScore))
     .sort((a, b) =>
       b.optimized_score - a.optimized_score ||
       Number(b.fatigue_cycle_score || 0) - Number(a.fatigue_cycle_score || 0) ||
@@ -328,6 +328,16 @@ export function applyShadowOptimization(picks = [], options = {}) {
     });
 
   return scored;
+}
+
+function isOptimizedProfitPick(pick, minScore) {
+  return Boolean(
+    pick.is_value_under &&
+    pick.real_line != null &&
+    pick.stat_type !== "pra" &&
+    ["near_market", "close_market"].includes(pick.line_match_quality) &&
+    Number(pick.optimized_score || 0) >= minScore
+  );
 }
 
 function shadowOptimizationScore(pick) {
@@ -393,6 +403,7 @@ function shadowOptimizationScore(pick) {
 function shadowOptimizationReasons(pick) {
   const reasons = [];
   if (pick.real_line != null) reasons.push("Real line");
+  if (["near_market", "close_market"].includes(pick.line_match_quality)) reasons.push("Market aligned");
   if (Number(pick.confidence_score || 0) >= 85) reasons.push("High confidence");
   if (Number(pick.fatigue_cycle_peak_score || 0) >= 0.85) reasons.push("Peak Energy Index");
   else if (Number(pick.fatigue_cycle_score || 0) >= 0.58) reasons.push("Low Energy Index");
