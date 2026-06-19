@@ -301,16 +301,16 @@ export function buildPickFeatures(player, logs, gameDate, opponentDefRating, lin
 }
 
 export function applyShadowOptimization(picks = [], options = {}) {
-  const minScore = Number(options.minScore ?? 0);
+  const minScore = Number(options.minScore ?? 50);
   const scored = picks.map((pick) => {
     const optimized_score = shadowOptimizationScore(pick);
-    const optimized_reasons = shadowOptimizationReasons(pick);
+    const optimized_reasons = shadowOptimizationReasons(pick, optimized_score);
     return {
       ...pick,
       optimized_score,
       optimized_rank: null,
       optimized_card: false,
-      optimized_profile: "market_aligned_profit_v3",
+      optimized_profile: optimized_score >= 85 ? "premium_v4" : "optimized_v4",
       optimized_reasons
     };
   });
@@ -334,8 +334,6 @@ function isOptimizedProfitPick(pick, minScore) {
   return Boolean(
     pick.is_value_under &&
     pick.real_line != null &&
-    pick.stat_type !== "pra" &&
-    ["near_market", "close_market"].includes(pick.line_match_quality) &&
     Number(pick.optimized_score || 0) >= minScore
   );
 }
@@ -344,74 +342,70 @@ function shadowOptimizationScore(pick) {
   if (!pick.is_value_under || pick.real_line == null) return 0;
   const confidence = Number(pick.confidence_score || 0);
   const energy = Number(pick.fatigue_cycle_score || 0);
-  const peak = Number(pick.fatigue_cycle_peak_score || 0);
-  const availability = Number(pick.availability_risk || 0);
   const minutesDip = Number(pick.load_risk || 0);
-  const sampleSize = Number(pick.fatigue_cycle_sample_size || 0);
 
   const statBonus = {
-    points: 24,
-    assists: 7,
-    rebounds: -18,
-    pra: -30
+    points: 22,
+    assists: 14,
+    rebounds: 2,
+    pra: -100
   }[pick.stat_type] || 0;
   const lineBonus = {
-    near_market: 12,
-    close_market: 4,
-    wide_gap: -8
+    near_market: 50,
+    close_market: 40,
+    wide_gap: -100
   }[pick.line_match_quality] || 0;
-  const riskPenalty = (pick.risk_tags || []).includes("Low sample") ? 8 : 0;
-  const peakBonus = peak >= 0.85 ? 34 : 0;
-  const peakHighBonus = peak >= 0.95 ? 10 : 0;
-  const lowEnergyBonus = energy >= 0.58 && energy < 0.7 ? 5 : 0;
-  const midLowPenalty = energy >= 0.7 && energy < 0.85 ? 35 : 0;
-  const confidenceShape = confidence >= 95
-    ? -24
-    : confidence >= 80 && confidence < 85
-      ? 10
-      : confidence >= 85 && confidence < 95
-        ? 2
-        : confidence >= 70
-          ? 0
-          : -10;
-  const restShape = Number(pick.days_rest) === 2
-    ? -12
-    : Number(pick.days_rest) === 1
-      ? 5
-      : Number(pick.days_rest) >= 5
-        ? 6
+  const energyShape = energy >= 0.95
+    ? 14
+    : energy >= 0.85
+      ? 9
+      : energy >= 0.7
+        ? -4
         : 0;
+  const confidenceShape = confidence >= 95
+    ? -18
+    : confidence >= 90
+      ? -18
+      : confidence >= 75
+        ? 14
+        : confidence < 70
+          ? -8
+          : 0;
+  const restShape = Number(pick.days_rest) === 2
+    ? -16
+    : Number(pick.days_rest) <= 1
+      ? -16
+      : Number(pick.days_rest) >= 5
+        ? 22
+        : Number(pick.days_rest) >= 3
+          ? 14
+          : 0;
 
   return Number((
-    70 +
-    energy * 10 +
-    peakBonus +
-    peakHighBonus +
-    lowEnergyBonus +
-    availability * 12 +
-    minutesDip * 6 +
-    Math.min(sampleSize, 20) * 0.2 +
-    confidenceShape +
-    restShape +
+    lineBonus +
     statBonus +
-    lineBonus -
-    riskPenalty -
-    midLowPenalty
+    restShape +
+    confidenceShape +
+    energyShape +
+    (minutesDip >= 0.45 ? 4 : 0)
   ).toFixed(2));
 }
 
-function shadowOptimizationReasons(pick) {
+function shadowOptimizationReasons(pick, optimizedScore = 0) {
   const reasons = [];
+  if (optimizedScore >= 85) reasons.push("Premium");
   if (pick.real_line != null) reasons.push("Real line");
   if (["near_market", "close_market"].includes(pick.line_match_quality)) reasons.push("Market aligned");
-  if (Number(pick.confidence_score || 0) >= 85) reasons.push("High confidence");
+  if (Number(pick.confidence_score || 0) >= 75 && Number(pick.confidence_score || 0) < 90) reasons.push("Confidence sweet spot");
+  if (Number(pick.confidence_score || 0) >= 90) reasons.push("Overconfidence caution");
   if (Number(pick.fatigue_cycle_peak_score || 0) >= 0.85) reasons.push("Peak Energy Index");
   else if (Number(pick.fatigue_cycle_score || 0) >= 0.58) reasons.push("Low Energy Index");
   if (Number(pick.fatigue_cycle_score || 0) >= 0.7 && Number(pick.fatigue_cycle_score || 0) < 0.85) reasons.push("Mid-energy caution");
   if (pick.stat_type === "points") reasons.push("Points profile");
   if (pick.stat_type === "assists") reasons.push("Assist profile");
+  if (Number(pick.days_rest) >= 3) reasons.push("Rest edge");
+  if (Number(pick.days_rest) <= 2) reasons.push("Rest caution");
   if (Number(pick.availability_risk || 0) >= 0.55) reasons.push("Availability watch");
-  if (Number(pick.days_rest) <= 1) reasons.push("Short rest");
   if (Number(pick.load_risk || 0) >= 0.45) reasons.push("Minutes dip");
   return reasons.slice(0, 5);
 }

@@ -31,7 +31,7 @@ export const config = {
   assumedJuice: Number(process.env.ASSUMED_JUICE || -115),
   modelLearningEnabled: process.env.MODEL_LEARNING_ENABLED === "true",
   modelLearningMinSamples: Number(process.env.MODEL_LEARNING_MIN_SAMPLES || 1000),
-  shadowOptimizedMinScore: Number(process.env.SHADOW_OPTIMIZED_MIN_SCORE || 0),
+  shadowOptimizedMinScore: Number(process.env.SHADOW_OPTIMIZED_MIN_SCORE || 50),
   realLinePicksOnly: process.env.REAL_LINE_PICKS_ONLY === "true",
   pregameRefreshWindowMinutes: Number(process.env.PREGAME_REFRESH_WINDOW_MINUTES || 75),
   pregameFullRefreshEveryMinutes: Number(process.env.PREGAME_FULL_REFRESH_EVERY_MINUTES || 30),
